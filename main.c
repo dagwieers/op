@@ -77,6 +77,7 @@ var_t	*Variables = NULL;
 struct passwd *realuser = NULL;
 int gargc = -1;
 char **gargv = NULL;
+sigset_t sig_mask, old_sig_mask;
 
 void Usage()
 {
@@ -97,9 +98,13 @@ char	**argv;
 	char		cmd_s[MAXSTRLEN];
 	char            *pcmd_s;
 
-	signal(SIGINT, SIG_IGN);
-	signal(SIGQUIT, SIG_IGN);
-	signal(SIGTERM, SIG_IGN);
+	sigemptyset(&sig_mask);
+	sigaddset(&sig_mask, SIGINT);
+	sigaddset(&sig_mask, SIGQUIT);
+	sigaddset(&sig_mask, SIGTERM);
+
+	if (sigprocmask(SIG_BLOCK, &sig_mask, &old_sig_mask))
+		fatal(1, "Could not set signal mask");
 
 	gargv = argv;
 	gargc = argc;
@@ -853,6 +858,8 @@ char	**argv;
 		printf("arg[%i] = '%s'\n", i, new_argv[i]);*/
 
 	logger(LOG_INFO, "SUCCESS");
+	if (sigprocmask(SIG_SETMASK, &old_sig_mask, NULL))
+		fatal(1, "Could not restore signal mask");
 	if (execve(new_argv[0], new_argv, new_envp) < 0)
 		perror("execve");
 	return 0;
