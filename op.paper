@@ -1,0 +1,358 @@
+
+
+        Op: A Flexible Tool for Restricted Superuser
+                           Access
+
+                      Tom Christiansen
+
+                CONVEX Computer Corporation
+                         POB 833851
+                   3000 Waterview Parkway
+                 Richardson, TX  75083-3851
+
+             {uunet,uiucdcs,sun}!convex!tchrist
+                     tchrist@convex.com
+
+                          ABSTRACT
+
+          The op tool provides  a  flexible  means  for
+     system   administrators  to  grant  trusted  users
+     access to certain root operations  without  having
+     to give them full superuser privileges.  Different
+     sets of users may access different operations, and
+     the  security-related  aspects  of  environment of
+     each operation can be carefully controlled.
+
+     One sure way to render a UNIX  system  unstable  is  to
+distribute  the  root  password  to everyone who thinks they
+need it.  Well-meaning and experienced though  these  people
+may  be,  they will inevitably introduce anomalies into your
+system that will cause it to malfunction in mysterious ways.
+You  may  spend  hours or even days trying to determine what
+was changed, by whom, and for  what  reason.   This  problem
+occurs even when all parties involved are experienced system
+administrators.
+
+     Furthermore, large sites often have computer  operators
+who  attend  to  the routine tasks of system administration,
+such as dumps and restores, tape handling, system  shutdown,
+and  so  on.   These people may not be sophisticated and you
+may not wish them to have complete system privileges  to  do
+their  jobs.  Denying the superuser password to your cowork-
+ers or management is difficult,  if  not  impossible.   This
+difficulty  is  particularly true in a technical environment
+where programmers may be competent, but insensitive  to  the
+management of a complex system.
+
+     The op program, a standard utility provided by  CONVEX,
+is  specifically  designed  to address this problem.  The op
+program gives the system manager a means to grant a user  or
+
+                        July 2, 1991
+
+                           - 2 -
+
+group of users limited access to specific superuser commands
+without granting access to all superuser privileges.   Care-
+ful control of the environment provides both flexibility and
+security.
+
+     To set up your system, the op  program,  you  begin  by
+finding  out  the specific tasks for which system privileges
+are deemed necessary when  a  user  requests  the  superuser
+password.  Complete access to every command on the system is
+usually not required.  Using  op,  the  system  manager  can
+designate  a set of privileged commands and access lists for
+these commands; the system manager,  in  effect,  can  grant
+limited system privileges beyond those normally available to
+a normal user without giving away full superuser privileges.
+
+     The op program is not interactive; it  functions  as  a
+prefix  command,  similar to time or nice, whose side-effect
+is to alter the user's  environment  in  some  fashion.  The
+functions  (or  mnemonics)  understood by the op program are
+listed in the configurable ascii data  file  /etc/op.access.
+This file describes what commands can be performed by the op
+program, how they are to be performed, and who is allowed to
+perform  them.   For  security  reasons, this file should be
+owned and readable only by the superuser.   Each  invocation
+of  op  is logged using syslog(3) with the LOG_AUTH facility
+class.
+
+     The restrictions can be made  as  tight  as  each  site
+demands,  as determined by the system administrator who cus-
+tomizes the op.access file.  This file contains a mapping of
+mnemonics,  or  operator functions, to the full pathnames of
+programs that should be invoked and the arguments  that  are
+allowed,  if any.  The arguments to the executed program can
+be a combination of literal and variable arguments, and res-
+trictions  can be placed on which values are valid substitu-
+tions for the variable arguments.   Because  some  syntactic
+checking  of the command arguments is possible, running com-
+mands under op can be safer than running them directly  from
+a  superuser's  shell.  This safety feature can prevent pit-
+falls like accidentally transposing the file system and tape
+device  arguments  to  the  dump  program  (eg.  dump  0uf /
+/dev/rmt16), which would destroy the file system.
+
+     The following set of attributes can be  controlled  for
+each mnemonic by the op program:
+
+	o    the user id to set
+
+	o    the group vector to set
+
+	o    the directory to chdir(2) to
+
+	o    the root directory to set with chroot(2)
+
+                        July 2, 1991
+
+                           - 3 -
+
+	o    the umask to set
+
+	o    a list of groups allowed to execute this function
+
+	o    a list of users allowed to execute this function
+
+	o    the range of valid arguments for the command,  both  in
+	     number and value
+
+	o    any environment variable settings
+
+     The fields of the entries in op.access are separated by
+white  space.  Each entry may span several lines and contin-
+ues until the next  alphanumeric  string  is  found  at  the
+beginning of a line (which is taken to be the next mnemonic,
+and thus the beginning of a new  entry).   Comments  may  be
+embedded  beginning  with  a  #  character.   Each  entry in
+op.access has the following form:
+
+     mnemonic     command  [ arg ... ]  ;  [ option ... ]
+
+where the fields are interpreted in the following manner:
+
+mnemonic    a  unique,  alphanumeric  identifier  for   each
+            operator function.
+
+command     the full pathname of the executable to be run by
+            op when the associated mnemonic is chosen.
+
+arg(s)      any  arguments,  either  literal  or   variable,
+            needed by command.  Literal arguments are simply
+            specified  directly,   like   specific   command
+            options  (0Gun) or files (/dev/rmt20).  Variable
+            arguments are specified here as $1, $2  ...  $n;
+            these  are  described  more fully in the options
+            section below.  $* indicates any number trailing
+            arguments.
+
+option(s)   a set of optional parameters to specify settings
+            or  restrictions  for  the  particular mnemonic,
+            define variable arguments specified for the com-
+            mand,  and define environment variable settings.
+            Options are separated by white space and are  of
+            the   form  keyword=value.   The  absence  of  a
+            specific option means the default is sufficient.
+            The  value  can  be  a single value or a list of
+            values separated by commas,  where  appropriate.
+            There  should  be no white space in each element
+            of the value string unless quoted.  The  keyword
+            is any of the following types:
+
+            uid     Set the user id to the value  specified.
+                    The  value can be a numeric user ID or a
+
+                        July 2, 1991
+
+                           - 4 -
+
+                    login name.  The default is root.
+
+            gid     Set the group ids to the  values  speci-
+                    fied.  Each value can be a numeric group
+                    ID or a group name.
+
+            dir     Change the current working directory  to
+                    the path specified.
+
+            chroot  Change the root directory  to  the  path
+                    specified using chroot.
+
+            umask   Set the file creation umask to the octal
+                    value  specified.  The default is to set
+                    it to 022.
+
+            groups  Allow any user who belongs  to  a  group
+                    listed here to execute this op function.
+                    The default is not to allow any specific
+                    group.
+
+            users   Allow any user listed  here  to  execute
+                    this op function.  The default is not to
+                    allow any specific users.  You  may  use
+                    the  regular  expression  .* to indicate
+                    that all users may use this mnemonic.
+
+            $n      defines the nth variable argument speci-
+                    fied in the command arg list.  The value
+                    for this type may be  a  comma-separated
+                    list   of   regular   expressions  using
+                    regex(3).  option defines the  range  of
+                    values  allowed  for  the variable argu-
+                    ments.  A variable argument specified as
+                    a  command  arg but not described in the
+                    options section may take on  any  value.
+                    If an argument does not match any of its
+                    permitted values, then a  diagnostic  is
+                    printed and the command is not executed.
+
+            $*      is used in the options section to  place
+                    restrictions  on  the trailing arguments
+                    specified as $* in the args section.  If
+                    any  of  these (possibly many) arguments
+                    do  not  match,  then  a  diagnostic  is
+                    printed,  and  the  command  is not exe-
+                    cuted.
+
+            $VAR    where VAR is the name of an  environment
+                    variable.    The  specified  environment
+                    variable  is  set  to  the  value  given
+                    before  the  command  is executed.  As a
+                    special case, simply using $VAR with  no
+                    =  part  (as  in  $USER) means that this
+
+                        July 2, 1991
+
+                           - 5 -
+
+                    environment   variable   is    inherited
+                    unchanged from the caller's shell.
+
+     There can also be a special entry in the file beginning
+at the first non-comment line that can define default values
+to override the builtin defaults listed here, yet  still  be
+overridden  by  any  entry that wants to redefine any of the
+keyword fields described above.  It should have the  follow-
+ing format:
+
+     DEFAULT      keyword_option ...
+where keyword_option is a  keyword=value  strings  mentioned
+above under options.
+
+     It should be noted that if any regular  mnemonic  entry
+defines  its own option, the value given for that entry must
+explicitly include the item from the  DEFAULT  line  if  the
+default  value  is  to  be  included.   That is, the options
+definitions completely override any defaults;  they  do  not
+add  to  them.   In  this  way,  if a value specified on the
+DEFAULT line for users or groups (for example) needs  to  be
+"erased"  without redefining new values (that is, we want no
+users or groups to be allowed to run  this  mnemonic),  then
+the  default  value  must  be overridden with nothing (as in
+users=).  For the users and groups fields, such a null  set-
+ting  has  the effect of setting the list of allowable users
+or groups to be empty.  For the other  keywords  (uid,  gid,
+dir,  chroot,  and umask), a null setting leaves that attri-
+bute as it is upon invocation of the op program,  overriding
+any defaults.
+
+     This file format may seem complex at first glance,  but
+is  actually  intuitive  and flexible.  An example op.access
+file might look like:
+
+                        July 2, 1991
+
+                           - 6 -
+
+# first, define the site defaults we want to use here
+# we would like the people in `operator' group to be able to execute
+# almost everything, so it is easier to put it here than on every line...
+# set up default envariables
+#
+DEFAULT groups=operator $USER $TERM $PATH=/usr/ucb:/usr/bin:/bin
+#
+#    find out who's filled up the disk; anyone may do this
+#
+full            /usr/etc/quot $1; users=.*
+#
+#    filesystem backups
+#
+daily           /etc/dump 5Gun $1; $1=/,/usr[0-9]*,/project
+weekly          /etc/dump 0Gun $1; $1=/,/usr[0-9]*,/project
+#
+#    tape handling commands
+#    must include `operator' if we want them to be allowed as well
+#
+tape            /etc/tpc $1 $2; groups=tapeopers,operator users=boss
+                $1=enable,disable,stop,restart $2=all,unit[01]
+#
+mounted         /etc/tpc mounted unit$1 $2; $1=[0-3]
+#
+#    taking the system down
+#    $1 shows a good use of regular expressions;
+#    $2 can be anything, but is required; no instant shutdowns
+#
+shutdown        /etc/shutdown -h $1 $2; $1=+[1-9][0-9]*,[0-9]*:[0-9]*
+reboot          /etc/shutdown -r $1 $2; $1=+[1-9][0-9]*,[0-9]*:[0-9]*
+#
+#    start up disco daemon
+disco           /etc/opbin/start_disco; uid=disco gid=proj dir=/scratch
+                        umask=027 groups=geo,disco users=snoopy,linus
+                        $USER=disco $SHELL=/bin/shell
+#
+#    let certain people mount and unmount the removable drive
+#
+rdsmount        /etc/mount $1 $2; groups=operator,swdev,disco users=bob,steve $1=/dev/dd0[a-g] $2=/.*
+rdsumount       /etc/umount $1; groups=operator,swdev,disco users=bob,steve $1=/dev/dd0[a-g]
+#
+#    allow operators to give files away; notice that they
+#    they must give at least two args, but may give more
+#
+chown            /etc/chown $1 $2 $*; $1=[a-z0-9][a-z0-9]*
+#
+#    permit development personnel to run install
+#
+inst            /usr/bin/install -o root -g system $1 $2; groups=devel
+                        $2=/bin,/usr/bin,/usr/ucb,/usr/new,/usr/local
+#
+nfsmount        /etc/mount -o timeo=100,hard,intr $1 $2; groups=devel,operator
+                        $1=\([a-zA-Z0-9_]*\):\(.*\) $2=/remote/\1\2
+
+                        July 2, 1991
+
+                           - 7 -
+
+     Some example command lines using op,  given  the  above
+op.access file, might be:
+
+     % op full /usr1
+     % op weekly /usr1
+     % op tape disable unit0
+     % op reboot 17:30 "We have to fix our network."
+     % op disco
+     % op rdsmount  /dev/dd0c  ~/mystuff
+     % op mounted 3 8688
+     % op chown jim  /tmp/bill/*
+     % op inst less  /usr/local
+     % op nfsmount  convexs:/usr/src  /remote/convexs/usr/src
+
+     Note that the following commands would not work because
+they  would  not  match the back-reference specifications in
+the nfsmount mnemonic:
+
+     op nfsmount convexs:/usr/src /remote/foobar/usr/src
+     op nfsmount convexs:/usr/src /remote/convexs/src
+
+     In summary, the op program allows the system manager to
+give  out limited system privileges without compromising the
+root password.  The system can be easily tuned to the  needs
+of a specific site.  The environment in which these commands
+execute  can  be  tightly  controlled  and  their  arguments
+checked  for  valid  values.  For security reasons, a log is
+kept of all commands run.  Careful  application  of  the  op
+program can result in a stabler system.
+
+                        July 2, 1991
+

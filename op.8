@@ -1,0 +1,213 @@
+.TH OP 1 
+.UC 4
+.SH NAME
+op \- operator access
+.SH SYNOPSIS
+.B op 
+mnemonic [arg]
+.SH DESCRIPTION
+The 
+.I op
+tool provides a flexible means for system administrators to grant
+trusted users access to certain 
+.B root
+operations without having to give them full superuser privileges.
+Different sets of users may access different operations, and the
+security-related aspects of environment of each
+operation can be carefully controlled.
+.PP 
+The fields of the entries in 
+.I op.access 
+are separated by white space.  Each entry may span several lines and
+continues until the next alphanumeric string is found at the beginning of
+a lines (which is taken to be the next
+.I mnemonic,
+and thus the beginning of a new entry).  Comments may be embedded
+beginning with a # character.  Each entry in op
+.I op.access
+has the following form:
+.RS
+.DT
+\fImnemonic	command \fR[\fI arg ... \fR]\fI ; \fR[\fI option ... \fR]
+.RE
+where the fields are interpreted in the following manner:
+.TP
+.I mnemonic
+a unique, alphanumeric identifier for each operator function.
+.TP
+.I command
+the full pathname of the executable to be run by
+.I op
+when the associated 
+.I mnemonic
+is chosen.
+.TP
+.I arg(s)
+any arguments, either literal or variable, needed by 
+.I command.
+Literal arguments are simply specified directly, like specific command
+options (\fB0Gun\fR) or files (\fB/dev/rmt20\fR).  Variable arguments
+are specified here as \fB$1, $2 ... $\fR\fIn\fR; these are described
+more fully in the options section below. \fB$*\fR indicates any number
+trailing arguments.
+.TP
+.I option(s)
+a set of optional parameters to specify settings or restoring for the
+particular 
+.I mnemonic,
+define variable arguments specified for the 
+.I command,
+space and are of the form
+.I keyword=value.
+The absence of a specific list of values separated by commas, where
+appropriate.
+There should be no white space in each element of the 
+.I value
+string unless quoted.  The
+.I keyword
+is any of the following types:
+.TP
+.B uid
+Set the user id to the value specified.  The value can be numeric user
+ID or a login name.  The default is 
+.B root.
+.TP
+.B gid
+Set the group id's to the values specified.  Each value can be a numeric
+group ID or a group name.
+.TP
+.B dir
+Change the current working directory to the path specified.
+.TP
+.B chroot
+Change the root directory to the path specified using 
+.I chroot.
+.TP
+.B umask
+Set the file creation umask to the octal value specified.  The default
+is to set it to 
+.B 022.
+.TP
+.B groups
+Allow any user who belongs to a group listed here to execute this 
+.I op
+function.  The default is not to allow any specific group.
+.TP
+.B users
+Allow any user listed here to execute this 
+.I op 
+function.  The default is not allow any specific users.  You may user
+the regular expression .* to indicate that all users may use this
+mnemonic.
+.TP
+.B password
+Queries the user for a password, if there is no = part the
+users own password is asked.
+.TP
+.B securid
+Queries the user for SecureID PIN and code. If op has been compiled
+without SecurID support, this option will cause the command to fail
+with an error message.
+.TP
+.BI $VAR
+where 
+.I VAR
+is the name of an environment variable.  The specified environment
+case, simply using
+.I $VAR with no = part (as in 
+.B $USER)
+means that this environment variable is inherited unchanged from
+the caller's shell.
+.TP
+.B environment
+Disables the destruction of the users environment.
+.TP
+.B $n
+defines the \fIn\fRth variable argument specified in the command 
+.I arg
+list.  The value for this type may be a comma-separated list of regular
+expressions using \fIegrep\fR(1).  option defines the range of values
+allowed for the variable arguments  A variable argument specified as a
+command 
+.I arg
+but not described in the 
+.I options
+section may take on any value.  If an argument does not match any
+of its permitted values, then a diagnostic is printed and the
+command is not executed.  When using '(' syntax to pass values
+to other options, only the next options can use values from
+the previous search.
+.TP
+.B $*
+is used in the 
+.I options
+section to place restriction on the trailing arguments
+specified as $* in the
+.I args 
+section.  If any of these (possibly many) arguments do not match, then
+a diagnostic is printed, and the command is not executed.
+.PP
+There can also be a special entry in the file beginning at the first
+non-comment line
+that can define default values to override the builtin defaults listed
+here, yet still be overridden by any entry that wants to redefine any of
+the keyword fields described above.  It should have the following format:
+.RS
+.DT
+\fBDEFAULT\fR	\fIkeyword_option\fR
+.RE
+where \fIkeyword_option\fR is a \fIkeyword=value\fR string mentioned above
+under \fIoptions\fR.
+.PP
+It should be noted that if any regular 
+.I mnemonic
+entry defines its own
+.I option,
+the value given for that entry must explicitly include the item from the
+DEFAULT line if the default values is to be included.  That is, the 
+.I options
+definitions completely override any
+defaults; they do not add to them  In this way, if a value specified on
+the DEFAULT line for 
+.B users
+or
+.B groups
+(for example) needs to be "erased" without redefining new values
+(that is, we want no users or groups to be allowed to run the mnemonic),
+then the default value must be overridden with nothing (as in
+\fBusers=\fR).  For the
+.B users
+or
+.B groups
+fields, such a null setting has the effect of setting the list of
+allowable users or groups to be empty.  For the other keywords (\fR
+uid, gid, dir, chroot, \fRand\fB umask\fR), a null setting leaves that
+attribute as it is upon invocation of the 
+.I op
+program, overriding any defaults.
+.PP
+Another note is that if the 
+.I command 
+for a 
+.I mnemonic
+is 
+.B MAGIC_SHELL
+then a shell (using the users $SHELL environment variable) is created, 
+if there are arguments in addition to the 
+.I mnemonic
+on the command line then the shell is invoked "-c args".
+.SH FILES
+.DT
+/etc/op.access	access control description
+.SH "SEE ALSO"
+su(1), chroot(2), egrep(1)
+.SH CREDIT
+.B "Op: A flexible Tool for Restricted Superuser Access",
+by
+.I "Tom Christiansen",
+CONVEX Computer Corporation,
+.B "Proceedings of the Large Installation Systems Administration III Workshop"
+.SH BUG REPORTS TO
+op-bugs@mips.com
+.SH COPYRIGHTS
+\fB\(co\fR\s12 Copyright 1991 by David Koblas

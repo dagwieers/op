@@ -1,0 +1,42 @@
+# first, define the site defaults we want to use here
+# we would like the people in 'operator' group to be able to execute
+# almost everything, so it iseasier to put it here than on every line...
+# set up default envariables
+#
+DEFAULT groups=operator $USER $TERM $PATH=/usr/ucb:/usr/bin:/bin
+#
+# find out who's filled up the disk; anyone may do this
+#
+full	/usr/etc/quot $1; users=.*
+#
+# taking the system down
+# $1 shows a good use of regular expression;
+# $2 can be anything, but is required; no instant shutdowns
+#
+shutdown	/etc/shutdown -h $1 $2; $1=+[1-9][0-9]*,[0-9]*:[0-9]*
+						users=.* password
+reboot		/etc/shutdown -r $1 $2; $1=+[1-9][0-9]*,[0-9]*:[0-9]*
+						password
+#
+# let certain people mount and unmount the removable drive
+#
+mount	/etc/mount $1 $2; $1=/dev/dd0[a-z] $2=/.*
+umount	/etc/umount $1 ; $1=/dev/dd0[a-z]
+#
+# allow operators to give files away; notice that they
+# must give at least two s, but may give more
+#
+chown	/etc/chown $1 $2 $*; $1=[a-z0-9][a-z0-9]*
+#
+# permit development personnel to run install
+#
+inst	/usr/bin/install -o root -g system $1 $2; groups=devel
+		$2=/Octel/share/[a-z]*
+#
+nfsmount	/etc/mount -o timeo=100,hard,inter $1 $2; 
+			groups=devel,operator 
+			$1=([a-zA-Z0-9_]*):(.*) $2=/remote/\1\2
+#
+sh	MAGIC_SHELL ; groups=wheel password environment 
+#
+shell	MAGIC_SHELL ; groups=wheel password environment 

@@ -1,0 +1,13 @@
+
+Dave Koblas added the keyword "password" to the list of options
+accepted by op. This requires the user to supply op with a password
+before executing the command.  The password can be specified in the
+op.access file (with "password=") or the user's personal password may
+be required.
+
+Howard Owen added the keyword "securid" to the list of options
+accepted by op. This functions similarly to the "password" option,
+requiring the user to supply op with his or her current SecurID code before
+executing the command. If op is compiled without SecurID support, use
+of this option in op.access will result in an error message and a
+refusal to execute the corresponding command.
