@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-#include <unistd.h>
 #include "defs.h"
 #include "regexp.h"
 
@@ -189,8 +188,8 @@ char	**argv;
 	if ((pw = getpwuid(getuid())) == NULL) 
 		exit(1);
 	realuser = getpwuid(getuid());
-	strcpy(user, pw->pw_name);
-	pcmd_s=format_cmd(argc,argv,cmd_s,MAXSTRLEN);
+	strncpy(user, pw->pw_name, MAXSTRLEN);
+	pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN);
 	if (Verify(new, num, argc, argv) < 0)
 		fatal(0, "Permission denied by op");
 
@@ -262,9 +261,9 @@ char *end = str + len - 2;
 }
 
 #ifdef USE_PAM
-int pam_conversation(int num_msg, struct pam_message **msg, struct pam_response **response, void *appdata_ptr) {
+int pam_conversation(int num_msg, const struct pam_message **msg, struct pam_response **response, void *appdata_ptr) {
 int i;
-struct pam_message *pm;
+const struct pam_message *pm;
 struct pam_response *pr;
 char *pass;
 
@@ -275,7 +274,7 @@ char *pass;
 	for (i = 0, pm = *msg, pr = *response; i < num_msg; ++i, ++pm, ++pr) {
 		switch (pm->msg_style) {
 			case PAM_PROMPT_ECHO_ON :
-				pass = malloc(512);
+				if (!(pass = malloc(512))) return PAM_CONV_ERR;
 				puts(pm->msg);
 				fgets(pass, 512, stdin);
 				pr->resp = pass;
@@ -415,16 +414,20 @@ char            input[64],*p;
 		return logger(LOG_ERR, "Could not get uid of current effective uid");
 
 	if ((cp = FindOpt(cmd, "groups")) != NULL) {
-	char grouphost[MAXSTRLEN + 256], hostname[256], regstr[MAXSTRLEN];
+	char grouphost[MAXSTRLEN + HOST_NAME_MAX],
+		hostname[HOST_NAME_MAX],
+		regstr[MAXSTRLEN];
 
-		if (gethostname(hostname, 256) == -1) return logger(LOG_ERR, "Could not get hostname");
+		if (gethostname(hostname, HOST_NAME_MAX) == -1)
+			return logger(LOG_ERR, "Could not get hostname");
 
-		for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
+		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL; cp = GetField(cp, str, MAXSTRLEN - 5)) {
 			strcpy(regstr, "^(");
 			strcat(regstr, str);
 			strcat(regstr, ")$");
 
-			if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+			if ((reg1 = regcomp(regstr)) == NULL)
+				return logger(LOG_ERR, "Invalid regex '%s'", regstr);
 
 			if ((gr = getgrgid(pw->pw_gid)) != NULL) {
 				strcpy(grouphost, gr->gr_name);
@@ -463,13 +466,14 @@ char            input[64],*p;
 	}
 
 	if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
-	char currenttime[13], hostname[256], userhost[MAXSTRLEN + 256],
+	char currenttime[13], hostname[HOST_NAME_MAX], userhost[MAXSTRLEN + HOST_NAME_MAX],
 		regstr[MAXSTRLEN];
 	time_t now = time(NULL);
 		
 		strftime(currenttime, 13, "%Y%m%d%H%M", localtime(&now));
 
-		if (gethostname(hostname, 256) == -1) return logger(LOG_ERR, "Could not get hostname");
+		if (gethostname(hostname, HOST_NAME_MAX) == -1)
+			return logger(LOG_ERR, "Could not get hostname");
 
 		for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
 		char expiretime[13], *expirestart = strchr(str, '/');
@@ -484,7 +488,8 @@ char            input[64],*p;
 			strcat(userhost, "@");
 			strcat(userhost, hostname);
 
-			if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+			if ((reg1=regcomp(regstr)) == NULL)
+				return logger(LOG_ERR, "Invalid regex '%s'", regstr);
 
 			if (regexec(reg1,pw->pw_name) == 1 || regexec(reg1, userhost) == 1) {
 				/* valid user, check expiry (if any) */
@@ -495,14 +500,17 @@ char            input[64],*p;
 
 					/* ensure at least some sanity in the expiry time */
 					for (i = 0; expirestart[i]; ++i) {
-						if (i > 11) return logger(LOG_ERR, "Expiry value (%s) has too many digits", expirestart);
-						if (!isdigit(expirestart[i])) return logger(LOG_ERR, "Expiry value (%s) has non-numeric characters", expirestart);
+						if (i > 11)
+							return logger(LOG_ERR, "Expiry value (%s) has too many digits", expirestart);
+						if (!isdigit(expirestart[i]))
+							return logger(LOG_ERR, "Expiry value (%s) has non-numeric characters", expirestart);
 					}
 
-					strcpy(expiretime, "000000000000"); /* YYYYMMDDHHmm */
+					strcpy(expiretime, "000000000000"); /* YYYYMMDD[HHmm] */
 					strncpy(expiretime, expirestart, strlen(expirestart));
 
-					if (strcmp(currenttime, expiretime) >= 0) return logger(LOG_ERR, "Access expired at %s", expiretime);
+					if (strcmp(currenttime, expiretime) >= 0)
+						return logger(LOG_ERR, "Access expired at %s", expiretime);
 				}
 
 				uid_fail = 0;
@@ -595,6 +603,8 @@ char            input[64],*p;
 char *str_replace(const char *source, int offset, int length, const char *paste) {
 char *buffer = malloc(strlen(source) - length + strlen(paste) + 1);
 
+	if (!buffer) fatal(1, "Can't allocate buffer");
+
 	strncpy(buffer, source, offset);
 	buffer[offset] = 0;
 	strcat(buffer, paste);
@@ -614,11 +624,31 @@ char	**argv;
 	struct passwd	*pw;
 	struct group	*gr;
 	int		ngroups;
-	gid_t gidset[256];
+	gid_t gidset[NGROUPS_MAX];
 	int		curenv = 0, curarg = 0;
 	char		*new_envp[MAXENV];
 	char		*new_argv[MAXARG];
 	char		str[MAXSTRLEN];
+
+	if ((cp = FindOpt(cmd, "gid")) == NULL) {
+		if (setgid(0) < 0)
+			fatal(1, "Unable to set gid to default");
+	} else {
+		for (i = 0, cp = GetField(cp, str, MAXSTRLEN); i < NGROUPS_MAX && cp != NULL; cp = GetField(cp, str, MAXSTRLEN), ++i) {
+			if ((gr = getgrnam(str)) != NULL)
+				gidset[ngroups++] = gr->gr_gid;
+			else
+				gidset[ngroups++] = atoi(str);
+		}
+		if (i == NGROUPS_MAX)
+			fatal(1, "Exceeded maximum number of groups");
+		if (ngroups == 0) 
+			fatal(1, "Unable to set gid to any group");
+		if (setgroups(ngroups, gidset) < 0)
+			fatal(1, "Unable to set auxiliary groups");
+		if (setgid(gidset[0]) < 0)
+			fatal(1, "Unable to set gid to %d", gidset[0]);
+	}
 
 	if ((cp = FindOpt(cmd, "uid")) == NULL) {
 		if (setuid(0) < 0)
@@ -630,21 +660,6 @@ char	**argv;
 		}
 		if (setuid(pw->pw_uid) < 0) {
 			fatal(1, "Unable to set uid to %s", cp);
-		}
-	}
-
-	if ((cp = FindOpt(cmd, "gid")) == NULL) {
-		;		/* don't have a default */
-	} else {
-		for (cp=GetField(cp, str, MAXSTRLEN); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN)) {
-			if ((gr = getgrnam(cp)) != NULL)
-				gidset[ngroups++] = gr->gr_gid;
-		}
-		if (ngroups == 0)  {
-			fatal(1, "Unable to setgid to any group");
-		}
-		if (setgroups(ngroups, gidset) < 0) {
-			fatal(1, "Set group failed");
 		}
 	}
 
@@ -724,9 +739,8 @@ char	**argv;
 			for (i = 1; i < argc; i++)
 				len += strlen(argv[i]) + 1;
 
-			if ((cp = (char *)malloc(len + 10)) == NULL) {
+			if ((cp = (char *)malloc(len + 10)) == NULL)
 				fatal(1, "Unable to create buffer");
-			}
 
 			len = 0;
 			*cp = '\0';
@@ -786,12 +800,16 @@ char	**argv;
 					char *buffer;
 
 						++cp;
+						/* Find total length of all arguments */
 						for (j = num + 1; j < argc; j++)
 							len += strlen(argv[j]) + 1;
 
-						buffer = malloc(len);
+						if ((buffer = malloc(len)) == NULL)
+							fatal(1, "Can't allocate buffer");
+
 						buffer[0] = 0;
 
+						/* Expand all arguments */
 						for (j = num + 1; j < argc; j++) {
 							strcat(buffer, argv[j]);
 							if (j < argc - 1) strcat(buffer, " ");
@@ -867,8 +885,8 @@ char *buf =0;
 
 	s = strlen(argv[0]);
 	if ((s>MAXSTRLEN) ){
-		retbuf=strcpy(retbuf,"unknown cmd (name too long in format_cmd)");
-		return(retbuf);
+		retbuf = strcpy(retbuf, "unknown cmd (name too long in format_cmd)");
+		return retbuf;
 	}
 	ss=s;
 	for (i = 1; i < argc; i++) { 

@@ -74,8 +74,11 @@ void msg(const char *format, ...)
 }
 
 char *expandvars(const char *instr) {
-char *str = (char*)malloc(8192);
+char *str = (char*)malloc(VAR_EXPAND_LEN);
 int i = 0;
+
+	if (str == NULL)
+		fatal(1, "Unable to allocate variable expansion buffer");
 
 	while (*instr)
 		if (isupper(*instr) || *instr == '_') {
@@ -123,17 +126,17 @@ void preproc(const char *str) {
 }
 
 void addvar(const char *str) {
-char name[64], value[8192];
+char name[VAR_NAME_LEN], value[VAR_EXPAND_LEN];
 const char *eq = strchr(str, '=');
 
-	if (eq && str - eq < 64) {
+	if (eq && str - eq < VAR_NAME_LEN) {
 	int i, o;
 	var_t *var;
 
 		strncpy(name, str, eq - str);
 		name[eq - str] = 0;
 
-		for (o = 0, i = eq - str + 1; str[i]; ++i)
+		for (o = 0, i = eq - str + 1; o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
 			if (str[i] == '\\') {
 				switch (str[++i]) {
 					case 'n' : value[o++] = '\n'; break;
@@ -150,8 +153,10 @@ const char *eq = strchr(str, '=');
 				value[o++] = str[i];
 		value[o++] = 0;
 
-		var = (var_t*)malloc(sizeof(var_t));
-		var->name = malloc(strlen(name) + 1);
+		if ((var = (var_t*)malloc(sizeof(var_t))) == NULL)
+			fatal(1, "Unable to allocate var_t");
+		if ((var->name = malloc(strlen(name) + 1)) == NULL)
+			fatal(1, "Unable to allocate variable name");
 		strcpy(var->name, name);
 		var->value = expandvars(value);
 		var->next = 0;
@@ -238,17 +243,20 @@ char	*name;
 {
 	cmd_t	*cmd = (cmd_t *)malloc(sizeof(cmd_t));
 
-	cmd->next = First;
-	First = cmd;
-
 	if (cmd == NULL)
 		fatal(1, "Unable to alloc space for new command");
+
+	cmd->next = First;
+	First = cmd;
 
 	cmd->name = savestr(name);
 	cmd->nargs = 0;		cmd->margs = 16;
 	cmd->nopts = 0;		cmd->mopts = 16;
 	cmd->args = (char **)malloc(sizeof(char *)*cmd->margs);
 	cmd->opts = (char **)malloc(sizeof(char *)*cmd->mopts);
+
+	if (cmd->args == NULL || cmd->opts == NULL)
+		fatal(1, "Unable to alloc args/opts");
 
 	return cmd;
 }

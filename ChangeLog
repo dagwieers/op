@@ -70,3 +70,12 @@ were not being expanded at all.
 ===================
 Trapping signals (SIGINT, etc.) so that a failed authentication attempt can not
 be broken out of.
+
+27/01/04 - op 1.1.10
+====================
+Applied some of the FreeBSD patches, thanks to Cyrille Lefevre (the previous
+FreeBSD port maintainer) for pointing me to these.
+Patched a potential buffer overflow, again, picked up by Cyrille.
+Added lots of checks for allocation failures.
+Added constraints to as many uses of strcpy/strcat as I could find.
+Added constraint on number of simultaneous groups a user can be in.

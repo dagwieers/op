@@ -8,6 +8,9 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#include <unistd.h>
+#include <limits.h>
+
 typedef struct cmd_s {
 	char		*name;
 	int		nargs, nopts;
@@ -33,4 +36,11 @@ int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
 #define OP_ACCESS	"/etc/op.conf"
-#define VERSION     "1.1.9"
+#define VERSION     "1.1.10"
+
+#define VAR_EXPAND_LEN	8192
+#define	VAR_NAME_LEN	64	
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX	255
+#endif
