@@ -122,6 +122,12 @@ is a regular expression matched against the systems hostname and <expiry> is a
 time in the form YYYYMMDD[hh[mm]] when that users access to the command
 expires.
 .TP
+.B netgroups
+Allow any user who belongs to a netgroup listed here to execute this 
+.I op
+function. The default is not to allow any specific netgroup.
+
+.TP
 .B password
 Queries the user for a password. If there is an = part the value is the crypted
 password required, otherwise the users own password is asked.

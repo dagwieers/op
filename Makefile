@@ -1,9 +1,9 @@
 #
 #  Default values. Override below for particular architectures
 #
-#CC=gcc
+CC=gcc
 INC= -I. -Wall
-LIBS= -ll 
+LIBS= -ll -L/lib -lpam -lcrypt
 DESTDIR=
 PREFIX=/usr
 BINDIR= $(DESTDIR)$(PREFIX)/bin
@@ -23,7 +23,7 @@ INSTALL-MAN =install -o $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT) $(MAND
 #
 #OPTS= -DUSE_SHADOW -g
 OPTS= -DUSE_PAM -g
-LDFLAGS = -lcrypt -lpam -g
+LDFLAGS = -g
 #
 #
 # Solaris 2.x  - SunPro c compiler
@@ -87,4 +87,4 @@ pkg: op
 	(umask 022; mkdir -p pkg/usr/bin pkg/usr/share/man/man1; mv op pkg/usr/bin; cp op.1 pkg/usr/share/man/man1; strip pkg/usr/bin/op; chown -R root:root pkg; chmod 4755 pkg/usr/bin/op; chmod 644 pkg/usr/share/man/man1/op.1)
 
 dist: clean
-	(V=`grep VERSION defs.h  | cut -d\" -f2`; rm -rf pkg; rm -f op-$$V.tar.gz; cd .. && mv op op-$$V && tar --exclude '.*.swp' --exclude CVS -czv -f op-$$V.tar.gz op-$$V && mv op-$$V op && mv op-$$V.tar.gz op)
+	(V=`grep VERSION defs.h  | cut -d\" -f2`; rm -rf pkg; rm -f op-$$V.tar.gz; cd .. && mv op op-$$V && tar --exclude '.*.swp' --exclude '.svn' -czv -f op-$$V.tar.gz op-$$V && mv op-$$V op && mv op-$$V.tar.gz op)
