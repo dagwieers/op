@@ -79,3 +79,13 @@ Patched a potential buffer overflow, again, picked up by Cyrille.
 Added lots of checks for allocation failures.
 Added constraints to as many uses of strcpy/strcat as I could find.
 Added constraint on number of simultaneous groups a user can be in.
+
+02/02/04 - op 1.20
+==================
+Fixed a fairly major bug whereby blocked signals were not restored to their
+original state upon execv'ing the child process.
+
+Changed version number scheme to match the original op versions, and bumped up
+to 1.20. This is part of a collaborative effort between myself and Steve
+Simmons, who is going to add Kerberos support to op in the near future. Welcome
+Steve.
