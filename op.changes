@@ -11,3 +11,11 @@ requiring the user to supply op with his or her current SecurID code before
 executing the command. If op is compiled without SecurID support, use
 of this option in op.access will result in an error message and a
 refusal to execute the corresponding command.
+
+November 22nd 1997 - op 1.1.1
+===============================
+Break shawdow support out from Solaris support. Added SHADOW symbol to the 
+build. It works on Linux 2.0.30. Presumably it still works on Solaris. 8)
+
+Cleaned up logging code. It was an uncomfortable mess. Slimmed it down some.
+

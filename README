@@ -7,14 +7,24 @@ original paper is included in this distribution in the file
 "op.paper". Differences between that design and the current
 implementation are noted in the file "op.changes".
 
-Op has been in use at Octel since 1992. Over the years I've added a 
-couple of things, and ported it to architectures we care about. These
-now include SunOS 4.1.x, Solaris 2.2 and greater, AIX, HP-UX 9.x, 
-BSDI 1.1 and Linux. I've added support for SecurID access control
-from Security  Dynamics. This particular code has only been tested
-under SunOS and Solaris. I also enhanced the syslog stuff so it will
-log the command parameters that op executes as well as the command
-name. Solaris shadow passwords are also supported. 
+I first came into contact with op at Octel in 1992. Over the years I
+added a couple of things, and ported it to architectures Octel cared
+about. Those included SunOS 4.1.x, Solaris 2.2 and greater, AIX,
+HP-UX 9.x, BSDI 1.1 and Linux 1.x. I added support for SecurID access
+control from Security Dynamics. This particular code has only been
+tested under SunOS and Solaris. I also enhanced the syslog stuff so it
+would log the command parameters that op executes as well as the
+command name. Support for Solaris shadow passwords was also added.
+
+I left Octel in 1996, and payed little attention to op for over a
+year. Recently, I had a need for op on Linux 2.0. I had to tweak the
+shadow password implementation to get it to work. while I was at it I
+cleaned up some of the logging code. It seems to work quite well on
+Linux. I've tried hard not to break other platforms with my mods, so
+they probably still work too. 8).I will test this code on any platform
+I need to use it on. If you have ported or built this code on other
+platforms, I'd like to hear from you. You can reach me via email at
+hbo@egbok.com. I'll try to help out with bugs time permitting.
 
 
 **** Disclaimer ****
@@ -30,6 +40,13 @@ your op.access file. You can study the sample file included with the
 distribution to get an idea of its semantics. Next, edit the Makefile
 and remove comments from  the lines appropriate to your
 architecture. 
+
+If you have shadow passwords, define the SHADOW symbol to build in
+Solaris style shadow support. This also works on Linux 2.0.30. Shadow
+passwords on other architectures have not been tested and are not
+supported. If you successfully port op to another platform's shadow
+password implementation, send me the diffs, and I'll try to roll them
+into the main distribution.
 
  If you have the Security Dynamics ACE server software,
 uncomment the lines pertaining to SECURID. Define SECURIDLIBDIR and
@@ -58,8 +75,8 @@ long last.
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
-	Ditto for my contributions which are Copyright (C) 1995 by
-	Howard Owen. (hbo@octel.com)
+	Ditto for my contributions which are Copyright (C) 1995, 1997 by
+	Howard Owen. (hbo@egbok.com)
 
 
 

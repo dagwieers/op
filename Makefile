@@ -18,15 +18,21 @@ MANDIR= $(BASE)/man/man$(MANEXT)
 INSTALL-MAN =install -o $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT) $(MANDIR)
 #DEBUG=-DDEBUG
 #
+# Linux 2.0.30
+#
+OPTS= -DSHADOW
+#
+#
 # Solaris 2.x  - SunPro c compiler
 #
+#OPTS= -DSHADOW
 #INSTALL=/usr/sbin/install -f $(BINDIR)	-m $(BINMODE) -u $(BINOWN) -g $(BINGRP) op
 #INSTALL-MAN =/usr/sbin/install -f $(MANDIR) -u $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT)
 #
 # Solaris 2.x/gcc
 #
 #CC=gcc
-#OPTS= -traditional
+#OPTS= -traditional -DSHADOW
 #INSTALL=/usr/sbin/install -f $(BINDIR)	-m $(BINMODE) -u $(BINOWN) -g $(BINGRP) op
 #INSTALL-MAN =/usr/sbin/install -f $(MANDIR) -u $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT)
 #

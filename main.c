@@ -24,7 +24,7 @@
 #  endif
 #endif
 
-#ifdef SOLARIS
+#ifdef SHADOW
 #include <shadow.h>
 #endif
 
@@ -72,7 +72,8 @@ char	**argv;
 	struct passwd	*pw;
 	int		hflag = 0;
 	char		*uptr = NULL;
-	char		*cmd_s = NULL;
+	char		cmd_s[MAXSTRLEN];
+	char            *pcmd_s;
 
 	Progname = argv[0];
 
@@ -156,13 +157,13 @@ char	**argv;
 	if ((pw = getpwuid(getuid())) == NULL) 
 		exit(1);
 	strcpy(user, pw->pw_name);
-	cmd_s=format_cmd(cmd,argc,argv);
+	pcmd_s=format_cmd(argc,argv,cmd_s);
 	if (Verify(new, num, argc, argv) < 0) {
 		syslog(LOG_NOTICE, "user %s FAILED to execute '%s'", 
 				user, cmd_s);
 		fatal("Permission denied by op");
 	} else {
-		syslog(LOG_NOTICE, "user %s SUCCEDED to execute '%s'",
+		syslog(LOG_NOTICE, "user %s SUCCEDED executing '%s'",
 				user, cmd_s);
 	}
 
@@ -254,7 +255,7 @@ char	**argv;
   regexp		*reg1 = NULL;
   regexp		*reg2 = NULL;
   struct passwd	*pw;
-#ifdef SOLARIS
+#ifdef SHADOW
   struct spwd *spw;
 #endif
   struct group	*gr;
@@ -291,8 +292,8 @@ char	**argv;
     if (((cp = GetField(cp, str)) != NULL) && 
 	((pw = getpwnam(str)) == NULL))
       return -1;
-#ifdef SOLARIS
-    if (strcmp(pw->pw_passwd,"x")==NULL){ /* Solaris shadow passwords */
+#ifdef SHADOW
+    if (strcmp(pw->pw_passwd,"x")==NULL){ /* Shadow passwords */
 	if ((spw = getspnam(pw->pw_name)) == NULL)
 	  return -1;
 	pw->pw_passwd=spw->sp_pwdp;
@@ -626,49 +627,46 @@ cmd_t	*cmd;
 	printf("\n");
 }
 char
-*format_cmd(cmd,argc,argv) 
+*format_cmd(argc,argv,retbuf) 
 /*   
      Format command and args for printing to syslog
      If length (command + args) is too long, try length(command). If THATS
      too long, return an error message.
 */
-cmd_t	*cmd;
 int     argc;
 char	**argv;
+char    *retbuf;
 {   
-    int	i,l,s,ss,m=0;
-    char *rtstr;
-    char *buf =0;
-    s=strlen(cmd->args[0]);
-    ss=s;
+  int	i,l=0,s,ss,m=0;
+  char *buf =0;
+  s = strlen(argv[0]);
+  if ((s>MAXSTRLEN) ){
+    retbuf=strcpy(retbuf,"unknown cmd (name too long in format_cmd)");
+    return(retbuf);
+  }
+  ss=s;
+  for (i = 1; i < argc; i++) { 
+    l=strlen(argv[i]);
+    m=l>m?l:m;
+    s+=l;
+  }
+  if (l) s+=argc-1; /* count spaces if there are arguments*/
+  if (s > MAXSTRLEN){ /* Ooops, we've gone over. */
+    s=ss; /* Just print command name */
+    m=0;
+    argc=0;
+  }
+  sprintf(retbuf,"%s",argv[0]);
+  if (m)
+    buf=(char *)malloc(m);
+  if (buf) {
     for (i = 1; i < argc; i++) {
-        l=strlen(argv[i]);
-	m=l>m?l:m;
-	s+=l;
+      sprintf(buf," %s",argv[i]);
+      strcat(retbuf,buf);
     }
-    s+=cmd->nargs; /* spaces */
-    if (s > MAXSTRLEN){
-	if (ss > MAXSTRLEN) 
-	    return("unknown cmd (name too long in format_cmd)");
-	s=ss; /* Just print command name */
-	m=0;
-	argc=0;
-    }
-    if (rtstr=(char *)malloc(s)){
-	if (m)
-	  buf=(char *)malloc(m);
-	if (buf) {
-	    sprintf(rtstr,"%s",cmd->args[0]);
-	    for (i = 1; i < argc; i++) {
-		sprintf(buf," %s",argv[i]);
-		strcat(rtstr,buf);
-	    }
-	    free(buf);
-	}
-    } else { /* malloc(s) failed */
-	return ("unknown cmd (malloc failed in format_cmd)");
-    }
-    return(rtstr);
+    free(buf);
+  }
+  return(retbuf);
 }
 
 
