@@ -112,3 +112,8 @@ a string pointing to the FULL PATH to the xauth binary.
 ==================
 The xauth modifier now updates $XAUTHORITY in the child environment.
 Fixed a bug when setting the GID explicitly.
+
+06/07/04 - op 1.24
+==================
+The xauth directive can now be given a target user, into whose environment the
+X authentication information is imported.
