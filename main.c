@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <netdb.h>
 #include <time.h>
 #include <signal.h>
 #include <stdio.h>
@@ -334,9 +335,9 @@ int	argc;
 int	num;
 char	**argv;
 {
-int		gr_fail = 1, uid_fail = 1;
+int		gr_fail = 1, uid_fail = 1, netgr_fail = 1;
 int		i, j, val;
-char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
+char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN], hostname[HOST_NAME_MAX];
 regexp		*reg1 = NULL;
 regexp		*reg2 = NULL;
 struct passwd	*pw;
@@ -415,16 +416,15 @@ char            input[64],*p;
 #endif
 	}
 
+	if (gethostname(hostname, HOST_NAME_MAX) == -1)
+		return logger(LOG_ERR, "Could not get hostname");
+
 	if ((pw = getpwuid(getuid())) == NULL) 
 		return logger(LOG_ERR, "Could not get uid of current effective uid");
 
 	if ((cp = FindOpt(cmd, "groups")) != NULL) {
 	char grouphost[MAXSTRLEN + HOST_NAME_MAX],
-		hostname[HOST_NAME_MAX],
 		regstr[MAXSTRLEN];
-
-		if (gethostname(hostname, HOST_NAME_MAX) == -1)
-			return logger(LOG_ERR, "Could not get hostname");
 
 		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL; cp = GetField(cp, str, MAXSTRLEN - 5)) {
 			strcpy(regstr, "^(");
@@ -471,14 +471,11 @@ char            input[64],*p;
 	}
 
 	if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
-	char currenttime[13], hostname[HOST_NAME_MAX], userhost[MAXSTRLEN + HOST_NAME_MAX],
+	char currenttime[13], userhost[MAXSTRLEN + HOST_NAME_MAX],
 		regstr[MAXSTRLEN];
 	time_t now = time(NULL);
 		
 		strftime(currenttime, 13, "%Y%m%d%H%M", localtime(&now));
-
-		if (gethostname(hostname, HOST_NAME_MAX) == -1)
-			return logger(LOG_ERR, "Could not get hostname");
 
 		for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
 		char expiretime[13], *expirestart = strchr(str, '/');
@@ -528,8 +525,17 @@ char            input[64],*p;
 		reg1=NULL;
 	}
 
-	if (gr_fail && uid_fail)
-		return logger(LOG_ERR, "Both user and group authentication failed");
+	if (uid_fail && (cp = FindOpt(cmd, "netgroups")) != NULL) {
+		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL && netgr_fail; cp = GetField(cp, str, MAXSTRLEN - 5)) {
+			if (innetgr(str, hostname, pw->pw_name, NULL)) {
+				netgr_fail = 0;
+				break;
+			}
+		}
+	}
+
+	if (gr_fail && uid_fail && netgr_fail)
+		return logger(LOG_ERR, "Both user, group and netgroup authentication failed");
 
 	for (i = 0; i < cmd->nopts; i++) {
 		if ((cmd->opts[i][0] != '$') || ((cp = strchr(cmd->opts[i], '=')) == NULL))

@@ -89,3 +89,11 @@ Changed version number scheme to match the original op versions, and bumped up
 to 1.20. This is part of a collaborative effort between myself and Steve
 Simmons, who is going to add Kerberos support to op in the near future. Welcome
 Steve.
+
+23/04/04 - op 1.21
+==================
+Added netgroup support. eg.
+
+	shell /bin/su -; netgroup=op-shell environment
+
+This is very useful in conjunction with either LDAP or NIS based netgroups.
