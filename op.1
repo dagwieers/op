@@ -150,6 +150,11 @@ the caller's shell.
 .B environment
 Disables the destruction of the users environment.
 .TP
+.B xauth
+Attempt to propagate the X authority entry for the current display to the new
+users X authority file. The DISPLAY environment variable is also propagated to
+the new environment.
+.TP
 .B $n
 defines the \fIn\fRth variable argument specified in the command 
 .I arg

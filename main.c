@@ -10,6 +10,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <errno.h>
 #include <sys/time.h>
 #include <netdb.h>
 #include <time.h>
@@ -641,6 +643,103 @@ char	**argv;
 	char		*new_argv[MAXARG];
 	char		str[MAXSTRLEN];
 
+#ifdef XAUTH
+	if (getenv("DISPLAY") != NULL && FindOpt(cmd, "xauth") != NULL) {
+	struct passwd *currentpw;
+	char tmpxauth[MAXSTRLEN], xauth[MAXSTRLEN], cxauth[MAXSTRLEN], *display;
+	int status;
+	uid_t uid;
+	gid_t gid;
+	struct stat st;
+
+		/* We need to find the destination user's info */
+		if ((cp = FindOpt(cmd, "uid")) == NULL) {
+			if ((pw = getpwuid(0)) == NULL)
+				fatal(1, "Can't get password entry for UID 0");
+		} else {
+			if ((pw = getpwnam(cp)) == NULL)
+				if ((pw = getpwuid(atoi(cp))) == NULL)
+					fatal(1, "Can't get password entry for %s", cp);
+		}
+		if ((display = strchr(getenv("DISPLAY"), ':')) == NULL)
+			fatal(1, "Could not extract X server from $DISPLAY '%s'", getenv("DISPLAY"));
+		strcpy(xauth, pw->pw_dir);
+		strcat(xauth, "/.Xauthority");
+		uid = pw->pw_uid;
+		gid = pw->pw_gid;
+		currentpw = getpwuid(getuid());
+		/* Now that we know the target user, we can copy the xauth cookies */
+		if (getenv("XAUTHORITY") != NULL) {
+			strcpy(cxauth, getenv("XAUTHORITY"));
+		} else {
+			strcpy(cxauth, currentpw->pw_dir);
+			strcat(cxauth, "/.Xauthority");
+		}
+		/* Do not continue if the source .Xauthority does not exist */
+		if (stat(cxauth, &st) == 0) {
+			strcpy(tmpxauth, "/var/tmp/op-xauth-XXXXXX");
+			if (mkstemp(tmpxauth) == -1)
+				fatal(1, "mkstemp(%s) failed with %i", tmpxauth, errno);
+			if (chown(tmpxauth, currentpw->pw_uid, currentpw->pw_gid) < 0) {
+				unlink(tmpxauth);
+				fatal(1, "Failed to change ownership of %s", tmpxauth);
+			}
+			/* Fork out to extract current X server to an XAUTH file */
+			if (fork() == 0) {
+			char *argv[] = { XAUTH, "-f", cxauth, "extract", tmpxauth, display, NULL };
+
+				/*	We need to be root to be sure that access to both Xauthority files
+					will work */
+				umask(077); setuid(currentpw->pw_uid); setgid(currentpw->pw_gid);
+				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s %s'", argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+				if (execv(XAUTH, argv) == -1) {
+					logger(LOG_ERR, "Unable to exec xauth, return code %i", errno);
+					exit(errno);
+				}
+				if (chown(tmpxauth, uid, gid) < 0) {
+					unlink(tmpxauth);
+					fatal(1, "Failed to change ownership of %s", tmpxauth);
+				}
+				exit(0);
+			}
+			if (wait(&status) == -1) {
+				unlink(tmpxauth);
+				fatal(1, "fork/wait failed");
+			}
+			if (status > 0) {
+				unlink(tmpxauth);
+				fatal(1, "Unable to export X authorisation entry, return code %i", status);
+			}
+			/* Fork out to insert extracted X server into new users XAUTH file */
+			if (fork() == 0) {
+			char *argv[] = { XAUTH, "-f", xauth, "merge", tmpxauth, NULL };
+
+				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s'", argv[0], argv[1], argv[2], argv[3], argv[4]);
+				/*	We need to be root to be sure that access to both Xauthority files
+					will work */
+				umask(077); setuid(uid); setgid(gid);
+				if (execv(XAUTH, argv) == -1) {
+					logger(LOG_ERR, "Unable to import X authorisation entry, return code %i", errno);
+					exit(errno);
+				}
+				exit(0);
+			}
+			if (wait(&status) == -1) {
+				unlink(tmpxauth);
+				fatal(1, "fork/wait failed");
+			}
+			unlink(tmpxauth);
+			if (status > 0)
+				fatal(1, "Unable to exec xauth, return code %i", status);
+			/* Propagate $DISPLAY to new environment */
+			new_envp[curenv] = malloc(9 + strlen(getenv("DISPLAY")));
+			strcpy(new_envp[curenv], "DISPLAY=");
+			strcat(new_envp[curenv], getenv("DISPLAY"));
+			++curenv;
+		}
+	}
+#endif
+
 	if ((cp = FindOpt(cmd, "gid")) == NULL) {
 		if (setgid(0) < 0)
 			fatal(1, "Unable to set gid to default");
@@ -668,9 +767,9 @@ char	**argv;
 		if ((pw = getpwnam(cp)) == NULL) {
 			if (setuid(atoi(cp)) < 0)
 				fatal(1, "Unable to set uid to %s", cp);
-		}
-		if (setuid(pw->pw_uid) < 0) {
-			fatal(1, "Unable to set uid to %s", cp);
+		} else {
+			if (setuid(pw->pw_uid) < 0)
+				fatal(1, "Unable to set uid to %s", cp);
 		}
 	}
 
