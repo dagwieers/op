@@ -4,7 +4,10 @@
  * Caveat:  this is V8 regexp(3) [actually, a reimplementation thereof],
  * not the System V one.
  */
-#define NSUBEXP  10
+#ifndef REGEXP_DWA20011023_H
+# define REGEXP_DWA20011023_H
+
+#define NSUBEXP  20
 typedef struct regexp {
 	char *startp[NSUBEXP];
 	char *endp[NSUBEXP];
@@ -15,7 +18,16 @@ typedef struct regexp {
 	char program[1];	/* Unwarranted chumminess with compiler. */
 } regexp;
 
-extern regexp *regcomp();
-extern int regexec();
-extern void regsub();
-extern void regerror();
+regexp *regcomp( char *exp );
+int regexec( regexp *prog, char *string );
+void regerror( char *s );
+void regsub(regexp *prog, char *source, char *dest);
+
+/*
+ * The first byte of the regexp internal "program" is actually this magic
+ * number; the start node begins in the second byte.
+ */
+#define	MAGIC	0234
+
+#endif // REGEXP_DWA20011023_H
+

@@ -8,6 +8,7 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#include <string.h>
 #include	<ctype.h>
 
 #ifdef TEST
@@ -21,7 +22,7 @@ char	**argv;
 }
 #endif
 
-atov(str,type)
+int atov(str,type)
 char	*str;
 int	type;
 {

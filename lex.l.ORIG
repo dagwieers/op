@@ -287,27 +287,30 @@ cmd_t	*cmd;
 		while ((cp = strchr(np, '$')) != NULL) {
 			if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
 				np = cp + 1;
-			else {
-				if (*(cp+1) == '*') {
-					wild = 1;
-					++cp;
-					np = cp;
-					continue;
-				}
-				cp++;
-				np = cp;
-				
-				while (isdigit(*cp))
-					cp++;
-				if ((cp - np) == 0)
-					continue;
-				strncpy(str, np, cp - np);
-				str[cp - np] = '\0';
-				val = atoi(str);
-				if (val > max)
-					max = val;
-			}
+			else
+				break;
 		}
+
+		if (cp == NULL)
+			continue;
+
+		if (*(cp+1) == '*') {
+			wild = 1;
+			continue;
+		}
+		
+		cp++;
+		np = cp;
+		
+		while (isdigit(*cp))
+			cp++;
+		if ((cp - np) == 0)
+			continue;
+		strncpy(str, np, cp - np);
+		str[cp - np] = '\0';
+		val = atoi(str);
+		if (val > max)
+			max = val;
 	}
 
 	if (wild)
