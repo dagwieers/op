@@ -153,7 +153,9 @@ Disables the destruction of the users environment.
 .B xauth
 Attempt to propagate the X authority entry for the current display to the new
 users X authority file. The DISPLAY environment variable is also propagated to
-the new environment.
+the new environment. The destination user is determined by first using the user
+specified after xauth=..., then the user specified by uid=... then finally the
+root user is used.
 .TP
 .B $n
 defines the \fIn\fRth variable argument specified in the command 

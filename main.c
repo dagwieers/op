@@ -644,7 +644,7 @@ char	**argv;
 	char		str[MAXSTRLEN];
 
 #ifdef XAUTH
-	if (getenv("DISPLAY") != NULL && FindOpt(cmd, "xauth") != NULL) {
+	if (getenv("DISPLAY") != NULL && (cp = FindOpt(cmd, "xauth")) != NULL) {
 	struct passwd *currentpw;
 	char tmpxauth[MAXSTRLEN], xauth[MAXSTRLEN], cxauth[MAXSTRLEN], *display;
 	int status;
@@ -653,7 +653,7 @@ char	**argv;
 	struct stat st;
 
 		/* We need to find the destination user's info */
-		if ((cp = FindOpt(cmd, "uid")) == NULL) {
+		if (cp == NULL && (cp = FindOpt(cmd, "uid")) == NULL) {
 			if ((pw = getpwuid(0)) == NULL)
 				fatal(1, "Can't get password entry for UID 0");
 		} else {
