@@ -636,7 +636,7 @@ char	**argv;
 	char		*cp, *np;
 	struct passwd	*pw;
 	struct group	*gr;
-	int		ngroups;
+	int		ngroups = 0;
 	gid_t gidset[NGROUPS_MAX];
 	int		curenv = 0, curarg = 0;
 	char		*new_envp[MAXENV];
@@ -691,14 +691,10 @@ char	**argv;
 				/*	We need to be root to be sure that access to both Xauthority files
 					will work */
 				umask(077); setuid(currentpw->pw_uid); setgid(currentpw->pw_gid);
-				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s %s'", argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s %s' as %i", argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], currentpw->pw_uid);
 				if (execv(XAUTH, argv) == -1) {
 					logger(LOG_ERR, "Unable to exec xauth, return code %i", errno);
 					exit(errno);
-				}
-				if (chown(tmpxauth, uid, gid) < 0) {
-					unlink(tmpxauth);
-					fatal(1, "Failed to change ownership of %s", tmpxauth);
 				}
 				exit(0);
 			}
@@ -714,9 +710,13 @@ char	**argv;
 			if (fork() == 0) {
 			char *argv[] = { XAUTH, "-f", xauth, "merge", tmpxauth, NULL };
 
-				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s'", argv[0], argv[1], argv[2], argv[3], argv[4]);
+				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s' as %i", argv[0], argv[1], argv[2], argv[3], argv[4], uid);
 				/*	We need to be root to be sure that access to both Xauthority files
 					will work */
+				if (chown(tmpxauth, uid, gid) < 0) {
+					unlink(tmpxauth);
+					fatal(1, "Failed to change ownership of %s", tmpxauth);
+				}
 				umask(077); setuid(uid); setgid(gid);
 				if (execv(XAUTH, argv) == -1) {
 					logger(LOG_ERR, "Unable to import X authorisation entry, return code %i", errno);
@@ -731,13 +731,21 @@ char	**argv;
 			unlink(tmpxauth);
 			if (status > 0)
 				fatal(1, "Unable to exec xauth, return code %i", status);
+			/* Update $XAUTHORITY */
+			new_envp[curenv] = malloc(strlen("XAUTHORITY=") + strlen(xauth) + 1);
+			strcpy(new_envp[curenv], "XAUTHORITY=");
+			strcat(new_envp[curenv], xauth);
+			++curenv;
 			/* Propagate $DISPLAY to new environment */
-			new_envp[curenv] = malloc(9 + strlen(getenv("DISPLAY")));
+			new_envp[curenv] = malloc(strlen("DISPLAY=") + strlen(getenv("DISPLAY")) + 1);
 			strcpy(new_envp[curenv], "DISPLAY=");
 			strcat(new_envp[curenv], getenv("DISPLAY"));
 			++curenv;
 		}
 	}
+#else
+	if (FindOpt(cmd, "xauth") != NULL)
+		fatal(1, "X authority support is not compiled into this version of op");
 #endif
 
 	if ((cp = FindOpt(cmd, "gid")) == NULL) {
