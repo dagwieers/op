@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <dirent.h>
 #include "defs.h"
 #include "regexp.h"
 
@@ -88,6 +89,35 @@ void Usage()
 			gargv[0], gargv[0]);
 }
 
+int ReadDir( char *dir )
+{
+DIR *d;
+
+	if ((d = opendir(dir)) != NULL)
+	{
+	struct dirent *f;
+	int successes = 0;
+
+		while ((f = readdir(d)))
+		{
+		char full_path[PATH_MAX];
+
+			if (f->d_name[0] == '.' || (strlen(f->d_name) > 5 && strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
+				continue;
+#ifdef HAVE_SNPRINTF
+			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, f->d_name);
+#else
+			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, f->d_name);
+#endif
+			if (ReadFile(full_path))
+				++successes;
+		}
+		closedir(d);
+		return successes;
+	}
+	return 0;
+}
+
 int main(argc, argv)
 int	argc;
 char	**argv;
@@ -96,7 +126,7 @@ char	**argv;
 	char		user[MAXSTRLEN];
 	cmd_t		*cmd, *def, *new;
 	struct passwd	*pw;
-	int		hflag = 0;
+	int		hflag = 0, read_conf = 0, read_conf_dir = 0;
 	char		*uptr = NULL;
 	char		cmd_s[MAXSTRLEN];
 	char            *pcmd_s;
@@ -160,7 +190,11 @@ char	**argv;
 	if (openlog("op", LOG_PID | LOG_CONS, LOG_AUTH) < 0) 
                 fatal(0, "openlog failed");
 #endif
-	ReadFile( OP_ACCESS );
+	read_conf = ReadFile( OP_ACCESS );
+	read_conf_dir = ReadDir( OP_ACCESS_DIR );
+
+	if (!read_conf && !read_conf_dir)
+		fatal(1, "Could not open %s or any configuration files in %s", OP_ACCESS, OP_ACCESS_DIR);
 
 	if (hflag) {
 		if (uptr != NULL) {

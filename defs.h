@@ -31,12 +31,14 @@ void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
 
 int ReadFile(char *file);
+int ReadDir(char *dir);
 int CountArgs(cmd_t *cmd);
 int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
 #define OP_ACCESS	"/etc/op.conf"
-#define VERSION     "1.25"
+#define OP_ACCESS_DIR	"/etc/op.d"
+#define VERSION     "1.26"
 
 #define VAR_EXPAND_LEN	8192
 #define	VAR_NAME_LEN	64	
