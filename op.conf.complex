@@ -1,0 +1,83 @@
+# Host definitions
+SWAPOFF_ORG=(blink|iris|seraph|cavern)
+FAILOVER_ORG=(thoth|ash|oak|widow)
+SELLICK_ID_AU=(beholder|kraken)
+ASN=(SWAPOFF_ORG|FAILOVER_ORG|SELLICK_ID_AU)
+
+# User definitions
+SWAPOFF_ORG_USERS=(athomas)
+SELLICK_ID_AU_USERS=(psellick)
+FAILOVER_ORG_USERS=(dcooper)
+ASN_USERS=(SWAPOFF_ORG_USERS|SELLICK_ID_AU_USERS|FAILOVER_ORG_USERS)
+
+# ACL definitions
+FAILOVER_ORG_ACL=FAILOVER_ORG_USERS@FAILOVER_ORG
+SWAPOFF_ORG_ACL=SWAPOFF_ORG_USERS@SWAPOFF_ORG
+SELLICK_ID_AU_ACL=SELLICK_ID_AU_USERS@SELLICK_ID_AU
+ASN_ACL=root|FAILOVER_ORG_ACL|SWAPOFF_ORG_ACL|SELLICK_ID_AU_ACL
+
+# Group definitions
+ASN_GROUPS=asn
+
+# Actions requiring authentication
+shell /bin/su -; users=ASN_ACL environment password
+sh /bin/su -; users=ASN_ACL environment password
+vi /usr/bin/vi $*; users=ASN_ACL password
+reboot /sbin/reboot; users=ASN_ACL environment password
+
+# Password-less commands
+shutdown /sbin/shutdown -h $1; users=ASN_ACL environment
+	$1=now|[0-1]?[0-9]:[0-9][0-9]|2[0-3]:[0-5][0-9]|\+[0-9]+
+ethereal /usr/bin/ethereal $*; users=ASN_ACL environment
+nomad /usr/bin/nomad $*; users=ASN_ACL environment
+tcpdump /usr/sbin/tcpdump $*; users=ASN_ACL environment
+nmap /usr/bin/nmap $*; users=ASN_ACL environment
+updatedb /usr/bin/updatedb; users=ASN_ACL environment
+makewhatis /bin/sh -c '
+		/usr/sbin/makewhatis &
+		echo makewhatis running in the background
+	';
+	users=ASN_ACL environment
+cdrom /sbin/mount /mnt/cdrom; users=ASN_ACL
+eject /usr/bin/eject; users=ASN_ACL
+nmap /usr/bin/nmap $*; users=ASN_ACL environment
+grip /bin/sh -c '/usr/bin/nice -n 19 /usr/bin/grip &';
+	users=ASN_ACL
+	user=athomas
+	group=audio
+	umask=007
+	environment
+
+# Cavern local commands
+gtkam	/usr/bin/gtkam; users=athomas environment $DISPLAY $GTKRC=/home/athomas/.gtkrc
+drip	/usr/bin/drip; users=athomas environment $DISPLAY $GTKRC=/home/athomas/.gtkrc
+evms	/bin/sh -c 'PATH=/sbin:/usr/sbin:$PATH /sbin/evmsgui &'; users=athomas environment $DISPLAY $GTKRC=/home/athomas/.gtkrc
+xine	/usr/bin/xine; users=athomas environment $DISPLAY
+
+# An example of how to use 
+mount	/bin/sh -c '
+	case $1 in
+		cdrom) /bin/mount /mnt/cdrom ;;
+		dvd) /bin/mount -o ro /dev/dvd /mnt/dvd ;;
+		burner) /bin/mount -o ro /dev/burner /mnt/burner ;;
+		*) echo "op: you do not have permission to mount \'$1\'" ;;
+	esac
+	';
+	users=athomas environment
+
+apache	/usr/sbin/apachectl $1;
+	users=athomas
+	environment
+	$1=start|stop|restart
+
+umount	/bin/sh -c '
+	case $1 in
+		cdrom) /bin/umount /mnt/cdrom ;;
+		dvd) /bin/umount /mnt/dvd ;;
+		burner) /bin/umount /mnt/burner ;;
+		*) echo "op: you do not have permission to unmount \'$1\'" ;;
+	esac
+	';
+	users=athomas environment
+
+tail	/usr/bin/tail -f $1; users=athomas

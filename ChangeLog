@@ -117,3 +117,14 @@ Fixed a bug when setting the GID explicitly.
 ==================
 The xauth directive can now be given a target user, into whose environment the
 X authentication information is imported.
+
+07/04/05 - op 1.26
+==================
+op will now read all config files in /etc/op.d with a .conf extension. This is
+a clean way of adding extra commands without having to manipulate op.conf.
+op.conf does not have to be present at all.  Useful for dropping in op config
+with other packages or when adding config to systems in bulk. Thanks to Kyle
+Hyland for this idea.
+
+Also made error reporting a bit smarter when config files are missing or have
+incorrect permissions. 

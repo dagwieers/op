@@ -15,17 +15,29 @@ operations without having to give them full superuser privileges.
 Different sets of users may access different operations, and the
 security-related aspects of environment of each
 operation can be carefully controlled.
+.PP
+Configuration entries are read from
+.B /etc/op.conf
+and all files in
+.B /etc/op.d
+with the extension
+.B .conf.
+Files must be owned by
+.I root
+and not have
+.I group
+or
+.I other
+permissions set.
 .PP 
-The fields of the entries in 
-.I op.conf 
-are separated by white space.  Each entry may span several lines and
-continues until the next alphanumeric string is found at the beginning of
-a lines (which is taken to be the next
+The fields of the entries in the configuration files are separated by white
+space.  Each entry may span several lines and continues until the next
+alphanumeric string is found at the beginning of a lines (which is taken to be
+the next
 .I mnemonic or variable definition,
 and thus the beginning of a new entry).  Comments may be embedded
-beginning with a # character.  Each entry in op
-.I op.conf
-has the following form:
+beginning with a # character.  Each entry in the configuration files has the
+following form:
 .RS
 .DT
 .PP
@@ -314,10 +326,14 @@ inetd /bin/sh -c '
 .PP
 
 .SH FILES
-.DT
-/etc/op.conf	access control description
+.TP
+.B /etc/op.conf
+Access control description file.
+.TP
+.B /etc/op.d/*.conf
+Access control description files.
 .SH "SEE ALSO"
-su(1), chroot(2), egrep(1)
+sudo(1), su(1), chroot(2), egrep(1)
 .SH CREDIT
 .B "Op: A flexible Tool for Restricted Superuser Access",
 originally by
@@ -330,7 +346,7 @@ Further changes by
 .I "Alec Thomas".
 .
 .SH BUG REPORTS TO
-alec@korn.ch
+alec@swapoff.org
 .SH COPYRIGHTS
 \fB\(co\fR\s12 Copyright 1991 by David Koblas
 \fB\(co\fR\s12 Copyright 2002 by Alec Thomas

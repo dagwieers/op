@@ -17,6 +17,7 @@ d 755 root sys ${bindir} -
 f 4755 root sys ${bindir}/op op
 
 d 755 root sys /etc -
+d 755 root sys /etc/op.d -
 c 600 root sys /etc/op.conf op.conf
 
 d 755 root sys ${mandir} -

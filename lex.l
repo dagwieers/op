@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <syslog.h>
 #include "defs.h"
 
 static cmd_t	*newcmd();
@@ -267,19 +268,20 @@ char	*file;
 	struct stat	statbuf;
 	FILE		*fd;
 	
-	if ((stat(file, &statbuf) < 0) || 
-		(statbuf.st_uid != 0) || /* Owned by root */
-		((statbuf.st_mode & 0077) != 0)) { /* SD - no perm */
-		fatal(1, "Permission problems on %s", file);
+	if ((stat(file, &statbuf) < 0))
+		return 0;
+	if ((statbuf.st_uid != 0) || /* Owned by root */
+			((statbuf.st_mode & 0077) != 0)) { /* SD - no perm */
+		logger(LOG_ERR, "Permission problems on %s", file);
+		return 0;
 	}
-	if ((fd = fopen(file,"r")) == NULL) {
-		fatal(1, "Couldn't open %s", file);
-	}
+	if ((fd = fopen(file,"r")) == NULL)
+		return 0;
 
 	yyin = fd;
 	yylex();
 
-	return 0;
+	return 1;
 }
 
 int CountArgs(cmd)
