@@ -22,7 +22,7 @@ INSTALL-MAN =install -o $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT) $(MAND
 # Linux 2.0.30
 #
 #OPTS= -DUSE_SHADOW -g
-OPTS= -DXAUTH=\"/usr/X11R6/bin/xauth\" -DUSE_PAM -g
+OPTS= -DXAUTH=\"/usr/X11R6/bin/xauth\" -DUSE_PAM -DHAVE_SNPRINTF -g
 LDFLAGS = -g
 #
 #
@@ -71,10 +71,12 @@ LDFLAGS = -g
 CFLAGS= $(OPTS) $(INC) $(GLOBALOPTS) $(SECURID)
 REG = regexp.o
 OBJ = lex.o main.o atov.o $(REG)
-op: $(OBJ)
+op: $(OBJ) op.list
 	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $(LDFLAGS) $(SECURIDLIBDIR) $(OBJ) $(SECURIDLIB) $(LIBS)
 clean:
 	rm -f $(OBJ) op core* lex.c \#* *~
+op.list: op.list.in
+	sed -e "s/@VERSION@/`grep VERSION defs.h | cut -d\\\" -f2`/" < op.list.in > op.list
 install: install-prog install-man
 install-prog:
 	mkdir -p $(BINDIR)

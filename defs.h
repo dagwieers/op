@@ -36,7 +36,7 @@ int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
 #define OP_ACCESS	"/etc/op.conf"
-#define VERSION     "1.23"
+#define VERSION     "1.24"
 
 #define VAR_EXPAND_LEN	8192
 #define	VAR_NAME_LEN	64	

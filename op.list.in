@@ -1,0 +1,24 @@
+%readme README
+%version @VERSION@
+%product Operator Escalation
+%copyright David Koblas, Howard Owen, Alec Thomas
+%license COPYING
+%vendor N/A
+
+
+# Directories...
+$prefix=/usr
+$exec_prefix=${prefix}
+$bindir=${exec_prefix}/bin
+$mandir=${prefix}/share/man
+$datadir=${prefix}/share
+
+d 755 root sys ${bindir} -
+f 4755 root sys ${bindir}/op op
+
+d 755 root sys /etc -
+c 600 root sys /etc/op.conf op.conf
+
+d 755 root sys ${mandir} -
+d 755 root sys ${mandir}/man1 -
+f 644 root sys ${mandir}/man1/op.1 op.1
