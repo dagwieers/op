@@ -8,13 +8,20 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
+#include <signal.h>
 #include <stdio.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <syslog.h>
 #include <pwd.h>
 #include <grp.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
 #include "defs.h"
 #include "regexp.h"
 
@@ -24,8 +31,16 @@
 #  endif
 #endif
 
-#ifdef SHADOW
+#if defined(USE_SHADOW) && defined(USE_PAM)
+#error USE_SHADOW and USE_PAM are mutually exclusive
+#endif
+
+#ifdef USE_SHADOW
 #include <shadow.h>
+#endif
+
+#ifdef USE_PAM
+#include <security/pam_appl.h>
 #endif
 
 #ifdef SECURID
@@ -41,6 +56,8 @@ union config_record configure;
 #define LOG_AUTH LOG_WARNING
 #endif
 
+#define LOG_PRINT	(1UL << 31)
+
 #define	MAXARG	1024
 #define	MAXENV	MAXARG
 
@@ -50,19 +67,25 @@ extern char	*strchr();
 extern char	*savestr();
 extern char	*getpass(), *crypt();
 
-char	*Progname;
-char    *format_cmd();
+char    *format_cmd(int argc, char **argv, char *retbuf, int buflen);
 char    *GetCode();
 cmd_t	*Find();
+int Verify(cmd_t *cmd, int num, int argc, char **argv);
+cmd_t	*Find(char *name);
+int Go(cmd_t *cmd, int num, int argc, char **argv);
 cmd_t	*First = NULL;
+var_t	*Variables = NULL;
+struct passwd *realuser = NULL;
+int gargc = -1;
+char **gargv = NULL;
 
-Usage()
+void Usage()
 {
-	fatal("Usage: %s mnemonic [args]\n       %s -H [-u username] mnemonic",
-			Progname, Progname);
+	fatal(0, "Usage: %s mnemonic [args]\n       %s -V -H [-u username] mnemonic",
+			gargv[0], gargv[0]);
 }
 
-main(argc, argv)
+int main(argc, argv)
 int	argc;
 char	**argv;
 {
@@ -75,13 +98,22 @@ char	**argv;
 	char		cmd_s[MAXSTRLEN];
 	char            *pcmd_s;
 
-	Progname = argv[0];
+	signal(SIGINT, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	signal(SIGTERM, SIG_IGN);
+
+	gargv = argv;
+	gargc = argc;
+	realuser = getpwuid(getuid());
 
 	while (1) {
 		if (argStart >= argc)
 			break;
 
-		if (strcmp("-H", argv[argStart]) == 0) {
+		if (strcmp("-V", argv[argStart]) == 0) {
+			printf("%s\n", VERSION);
+			return 0;
+		} else if (strcmp("-H", argv[argStart]) == 0) {
 			hflag++;
 			argStart++;
 		} else if (strcmp("-u", argv[argStart]) == 0) {
@@ -116,17 +148,17 @@ char	**argv;
 	}
 
 #if defined (bsdi) || defined (SOLARIS) || defined (__linux__)
-        openlog("op", 0, LOG_AUTH);
+        openlog("op", LOG_PID | LOG_CONS, LOG_AUTH);
 #else
-	if (openlog("op", 0, LOG_AUTH) < 0) 
-                fatal("openlog failed");
+	if (openlog("op", LOG_PID | LOG_CONS, LOG_AUTH) < 0) 
+                fatal(0, "openlog failed");
 #endif
 	ReadFile( OP_ACCESS );
 
 	if (hflag) {
 		if (uptr != NULL) {
 			if (getuid() != 0) 
-				fatal("Permission denied for -u option");
+				fatal(1, "Permission denied for -u option");
 		}
 	}
 	if (uptr != NULL) 
@@ -139,7 +171,7 @@ char	**argv;
 	cmd = Find(argv[argStart]);
 
 	if (cmd == NULL) 
-		fatal("No such command %s", argv[1]);
+		fatal(1, "No such command %s", argv[1]);
 
 	argc -= argStart;
 	argv += argStart;
@@ -148,41 +180,21 @@ char	**argv;
 	num = CountArgs(new);
 
 	if ((num < 0) && ((argc-1) < -num))
-		fatal("Improper number of arguments");
+		fatal(1, "Improper number of arguments");
 	if ((num > 0) && ((argc-1) != num)) 
-		fatal("Improper number of arguments");
+		fatal(1, "Improper number of arguments");
 	if (num <0)
 		num = -num;
 
 	if ((pw = getpwuid(getuid())) == NULL) 
 		exit(1);
+	realuser = getpwuid(getuid());
 	strcpy(user, pw->pw_name);
-	pcmd_s=format_cmd(argc,argv,cmd_s);
-	if (Verify(new, num, argc, argv) < 0) {
-		syslog(LOG_NOTICE, "user %s FAILED to execute '%s'", 
-				user, cmd_s);
-		fatal("Permission denied by op");
-	} else {
-		syslog(LOG_NOTICE, "user %s SUCCEDED executing '%s'",
-				user, cmd_s);
-	}
+	pcmd_s=format_cmd(argc,argv,cmd_s,MAXSTRLEN);
+	if (Verify(new, num, argc, argv) < 0)
+		fatal(0, "Permission denied by op");
 
 	return Go(new, num, argc, argv);
-}
-
-fatal(va_alist)
- va_dcl
-{
-	va_list	ap;
-	char	*s;
-
-	va_start(ap);
-	s = va_arg(ap, char *);
-	vfprintf(stderr, s, ap);
-	fputc('\n', stderr);
-	va_end(ap);
-
-	exit(1);
 }
 
 cmd_t	*Find(name)
@@ -220,9 +232,12 @@ char	*str;
 	return NULL;
 }
 
-char	*GetField(cp, str)
+char	*GetField(cp, str, len)
 char	*cp, *str;
+int len;
 {
+char *end = str + len - 2;
+
 	if (*cp == '\0')
 		return NULL;
 
@@ -236,6 +251,9 @@ char	*cp, *str;
 		else
 			*str++ = *cp;
 		cp++;
+		/* string exceeded target buffer length */
+		if (str >= end)
+			return NULL;
 	}
 
 	*str = '\0';
@@ -243,201 +261,348 @@ char	*cp, *str;
 	return (*cp == '\0') ? cp : (cp+1);
 }
 
-Verify(cmd, num, argc, argv)
+#ifdef USE_PAM
+int pam_conversation(int num_msg, struct pam_message **msg, struct pam_response **response, void *appdata_ptr) {
+int i;
+struct pam_message *pm;
+struct pam_response *pr;
+char *pass;
+
+	if ((*response = malloc(sizeof(struct pam_response) * num_msg)) == NULL)
+		return PAM_CONV_ERR;
+	memset(*response, 0, num_msg * sizeof(struct pam_response));
+
+	for (i = 0, pm = *msg, pr = *response; i < num_msg; ++i, ++pm, ++pr) {
+		switch (pm->msg_style) {
+			case PAM_PROMPT_ECHO_ON :
+				pass = malloc(512);
+				puts(pm->msg);
+				fgets(pass, 512, stdin);
+				pr->resp = pass;
+			break;
+			case PAM_PROMPT_ECHO_OFF :
+				if ((pass = getpass(pm->msg)) == NULL) {
+					for (pr = *response, i = 0; i < num_msg; ++i, ++pr)
+						if (pr->resp) {
+							memset(pr->resp, 0, strlen(pr->resp));
+							free(pr->resp);
+							pr->resp = NULL;
+						}
+					memset(*response, 0, num_msg * sizeof(struct pam_response));
+					free(*response);
+					*response = NULL;
+					return PAM_CONV_ERR;
+				}
+				pr->resp = strdup(pass);
+			break;
+			case PAM_TEXT_INFO :
+				if (pm->msg)
+					puts(pm->msg);
+			break;
+			case PAM_ERROR_MSG :
+				if (pm->msg) {
+					fputs(pm->msg, stderr);
+					fputc('\n', stderr);
+				}
+			break;
+			default :
+				for (pr = *response, i = 0; i < num_msg; ++i, ++pr)
+					if (pr->resp) {
+						memset(pr->resp, 0, strlen(pr->resp));
+						free(pr->resp);
+						pr->resp = NULL;
+					}
+				memset(*response, 0, num_msg * sizeof(struct pam_response));
+				free(*response);
+				*response = NULL;
+				return PAM_CONV_ERR;
+			break;
+		}
+	}
+	return PAM_SUCCESS;
+}
+
+#endif
+
+int Verify(cmd, num, argc, argv)
 cmd_t	*cmd;
 int	argc;
 int	num;
 char	**argv;
 {
-  int		gr_fail = 1, uid_fail = 1;
-  int		i, j, val;
-  char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
-  regexp		*reg1 = NULL;
-  regexp		*reg2 = NULL;
-  struct passwd	*pw;
-#ifdef SHADOW
-  struct spwd *spw;
+int		gr_fail = 1, uid_fail = 1;
+int		i, j, val;
+char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
+regexp		*reg1 = NULL;
+regexp		*reg2 = NULL;
+struct passwd	*pw;
+#ifdef USE_SHADOW
+struct spwd *spw;
 #endif
-  struct group	*gr;
-#ifdef SECURID
-	struct          SD_CLIENT sd_dat, *sd;
-	int             k;
-	char            input[64],*p;
+#ifdef USE_PAM
+struct pam_conv pamconv = { pam_conversation, NULL };
+pam_handle_t *pam;
 #endif
-  
-  if ((pw = getpwuid(getuid())) == NULL) 
-    return -1;
+struct group	*gr;
 #ifdef SECURID
-  if ((cp=FindOpt(cmd, "securid")) != NULL) {
-      memset(&sd_dat, 0, sizeof(sd_dat));   /* clear sd_auth struct */
-      sd = &sd_dat;
-      creadcfg();		/*  accesses sdconf.rec  */
-      if (sd_init(sd)){
-	  printf("Cannot contact ACE server\n");
-	  return -1;
-      }
-      if (sd_auth(sd))
-	return -1;
-  }
+struct          SD_CLIENT sd_dat, *sd;
+int             k;
+char            input[64],*p;
+#endif
+
+	if ((pw = getpwuid(getuid())) == NULL) return -1;
+
+	#ifdef SECURID
+	if ((cp=FindOpt(cmd, "securid")) != NULL) {
+		memset(&sd_dat, 0, sizeof(sd_dat));   /* clear sd_auth struct */
+		sd = &sd_dat;
+		creadcfg();		/*  accesses sdconf.rec  */
+		if (sd_init(sd)){
+			return logger(LOG_WARNING | LOG_PRINT, "Cannot contact ACE server");
+		}
+		if (sd_auth(sd)) return -1;
+	}
+	#else
+	if ((cp=FindOpt(cmd, "securid")) != NULL) {
+		return logger(LOG_ERR | LOG_PRINT, "SecureID not supported by op. Access denied");
+	}
+	#endif	
+
+	if ((cp=FindOpt(cmd, "password")) != NULL) {
+#ifdef USE_PAM
+		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+			if ((np = getpass("Password:")) == NULL)
+				return logger(LOG_ERR, "Could not get user password");
+
+			if (strcmp(crypt(np, str), str) != 0)
+				return logger(LOG_ERR, "Incorrect direct password");
+		} else {
+		int resp;
+
+			resp = pam_start("op", pw->pw_name, &pamconv, &pam);
+			if (resp == PAM_SUCCESS)
+				resp = pam_authenticate(pam, PAM_SILENT);
+			if (resp == PAM_SUCCESS)
+				resp = pam_acct_mgmt(pam, 0);
+			if (resp != PAM_SUCCESS) {
+				return logger(LOG_ERR, "pam_authticate: %s", pam_strerror(pam, resp));
+			}
+			pam_end(pam, resp);
+		}
 #else
-  if ((cp=FindOpt(cmd, "securid")) != NULL) {
-      printf("SecureID not supported by op.\nAccess denied\n");
-      return -1;
-  }
-#endif	
-  if ((cp=FindOpt(cmd, "password")) != NULL) {
-    if ((np = getpass("Password:")) == NULL)
-      return -1;
+		if ((np = getpass("Password:")) == NULL)
+			return logger(LOG_ERR, "Could not get user password");
 
-    if (((cp = GetField(cp, str)) != NULL) && 
-	((pw = getpwnam(str)) == NULL))
-      return -1;
-#ifdef SHADOW
-    if (strcmp(pw->pw_passwd,"x")==NULL){ /* Shadow passwords */
-	if ((spw = getspnam(pw->pw_name)) == NULL)
-	  return -1;
-	pw->pw_passwd=spw->sp_pwdp;
-    }
+		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+			if (strcmp(crypt(np, str), str) != 0)
+				return logger(LOG_ERR, "Incorrect direct password");
+		} else {
+			#ifdef USE_SHADOW
+			if (strcmp(pw->pw_passwd,"x")==0){ /* Shadow passwords */
+				if ((spw = getspnam(pw->pw_name)) == NULL)
+					return logger(LOG_ERR, "No shadow entry for '%s'", pw->pw_name);
+				pw->pw_passwd=spw->sp_pwdp;
+			}
+			#endif
+
+			if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
+				return logger(LOG_ERR, "Invalid user password");
+		}
 #endif
-	
-    if (strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
-      return -1;
-
-  }
-  
-  if ((pw = getpwuid(getuid())) == NULL) 
-    return -1;
-
-  if ((cp = FindOpt(cmd, "groups")) != NULL) {
-    for (cp=GetField(cp, str); cp!=NULL; cp=GetField(cp, str)) {
-      if ((reg1=regcomp(str)) == NULL)
-	return -1;
-      if ((gr = getgrgid(pw->pw_gid)) != NULL) {
-	if (regexec(reg1,gr->gr_name) == 1) {
-	  gr_fail = 0;
-	  break;
 	}
-      }
 
-      setgrent();
-      while ((gr = getgrent()) != NULL) {
-	i = 0;
-	while (gr->gr_mem[i] != NULL) {
-	  if (strcmp(gr->gr_mem[i],
-		     pw->pw_name)==0)
-	    break;
-	  i++;
-	}
-	if ((gr->gr_mem[i] != NULL) && 
-	    (regexec(reg1,gr->gr_name) == 1)) {
-	  gr_fail = 0;
+	if ((pw = getpwuid(getuid())) == NULL) 
+		return logger(LOG_ERR, "Could not get uid of current effective uid");
 
-	  break;
-	}
-	if (gr->gr_mem[i] != NULL) {
-	  if (regexec(reg1,gr->gr_name) == 1) {
-	    gr_fail = 0;
-	    break;
-	  }
-	}
-      }
-    }
-  }
-  if(reg1 != NULL){
-    free(reg1);
-    reg1=NULL;
-  }
-	
-  if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
-    for (cp=GetField(cp, str); cp!=NULL; cp=GetField(cp, str)) {
-      if ((reg1=regcomp(str)) == NULL)
-	return -1;
-      if (regexec(reg1,pw->pw_name) == 1) {
-	uid_fail = 0;
-	break;
-      }
-    }
-  }
-  if(reg1 != NULL){
-    free(reg1);
-    reg1=NULL;
-  }
+	if ((cp = FindOpt(cmd, "groups")) != NULL) {
+	char grouphost[MAXSTRLEN + 256], hostname[256], regstr[MAXSTRLEN];
 
-  if (gr_fail && uid_fail)
-    return -1;
-  for (i = 0; i < cmd->nopts; i++) {
-    if ((cmd->opts[i][0] != '$') || 
-	((cp = strchr(cmd->opts[i], '=')) == NULL))
-      continue;
-    if (cmd->opts[i][1] != '*') {
-      for (np = cmd->opts[i] + 1; np != cp; np++) 
-	if (!isdigit(*np))
-	  break;
-      if (np != cp)
-	continue;
-    } else {
-      if (cmd->opts[i][2] != '=')
-	continue;
-      np = cmd->opts[i] + 3;
-      for (j = num+1; j < argc; j++) {
-	cp = np;
-	for (cp=GetField(cp, str); cp!=NULL; 
-	     cp=GetField(cp, str)) {
-	  if ((reg1=regcomp(str)) == NULL)
-	    return -1;
-	  if (regexec(reg1,argv[j]) == 1)
-	    break;
+		if (gethostname(hostname, 256) == -1) return logger(LOG_ERR, "Could not get hostname");
+
+		for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
+			strcpy(regstr, "^(");
+			strcat(regstr, str);
+			strcat(regstr, ")$");
+
+			if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+
+			if ((gr = getgrgid(pw->pw_gid)) != NULL) {
+				strcpy(grouphost, gr->gr_name);
+				strcat(grouphost, "@");
+				strcat(grouphost, hostname);
+
+				if (regexec(reg1,gr->gr_name) == 1 || regexec(reg1, grouphost)) {
+					gr_fail = 0;
+					break;
+				}
+			}
+
+			setgrent();
+			while ((gr = getgrent()) != NULL) {
+				i = 0;
+				while (gr->gr_mem[i] != NULL) {
+					if (strcmp(gr->gr_mem[i], pw->pw_name)==0) break;
+					i++;
+				}
+
+				if (gr->gr_mem[i] != NULL) {
+					strcpy(grouphost, gr->gr_name);
+					strcat(grouphost, "@");
+					strcat(grouphost, hostname);
+					if (regexec(reg1, gr->gr_name) == 1 || regexec(reg1, grouphost)) {
+						gr_fail = 0;
+						break;
+					}
+				}
+			}
+		}
 	}
-	if (cp == NULL)
-	  return -1;
-      }
-    }
-    if(reg1 != NULL){
-      free(reg1);
-      reg1=NULL;
-    }
+	if(reg1 != NULL){
+		free(reg1);
+		reg1=NULL;
+	}
+
+	if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
+	char currenttime[13], hostname[256], userhost[MAXSTRLEN + 256],
+		regstr[MAXSTRLEN];
+	time_t now = time(NULL);
 		
-    strncpy(str, cmd->opts[i] + 1, cp - cmd->opts[i] - 1);
-    str[cp - cmd->opts[i] - 1] = '\0';
-    val = atoi(str);
-    
-    if (val >= argc)
-      continue;
-    cp++;
-    np = cp;
-    if (reg2 != NULL) {
-      for (cp=GetField(cp, str); cp!=NULL; 
-	   cp=GetField(cp, str)) {
-	regsub(reg2, str, buf);
-	if (strcmp(buf, argv[val]) == 0)
-	  break;
-      }
-      if (cp != NULL)
-	continue;
-      
-      free(reg2);
-      reg2 = NULL;
-    }
-    
-    if ((reg2 == NULL) || (cp == NULL)) {
-      cp = np;
-      for (cp=GetField(cp, str); cp!=NULL; 
-	   cp=GetField(cp, str)) {
-	if ((reg2=regcomp(str)) == NULL) 
-	  return -1;
-	if (regexec(reg2,argv[val]) == 1)
-	  break;
+		strftime(currenttime, 13, "%Y%m%d%H%M", localtime(&now));
 
-	free(reg2);
-	reg2 = NULL;
-      }
-    }
-    if (cp == NULL)
-      return -1;
-  }
+		if (gethostname(hostname, 256) == -1) return logger(LOG_ERR, "Could not get hostname");
+
+		for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
+		char expiretime[13], *expirestart = strchr(str, '/');
+
+			if (expirestart) *expirestart = 0;
+
+			strcpy(regstr, "^(");
+			strcat(regstr, str);
+			strcat(regstr, ")$");
+
+			strcpy(userhost, pw->pw_name);
+			strcat(userhost, "@");
+			strcat(userhost, hostname);
+
+			if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+
+			if (regexec(reg1,pw->pw_name) == 1 || regexec(reg1, userhost) == 1) {
+				/* valid user, check expiry (if any) */
+				if (expirestart) {
+				int i;
+
+					++expirestart;
+
+					/* ensure at least some sanity in the expiry time */
+					for (i = 0; expirestart[i]; ++i) {
+						if (i > 11) return logger(LOG_ERR, "Expiry value (%s) has too many digits", expirestart);
+						if (!isdigit(expirestart[i])) return logger(LOG_ERR, "Expiry value (%s) has non-numeric characters", expirestart);
+					}
+
+					strcpy(expiretime, "000000000000"); /* YYYYMMDDHHmm */
+					strncpy(expiretime, expirestart, strlen(expirestart));
+
+					if (strcmp(currenttime, expiretime) >= 0) return logger(LOG_ERR, "Access expired at %s", expiretime);
+				}
+
+				uid_fail = 0;
+				break;
+			}
+		}
+	}
+	if(reg1 != NULL){
+		free(reg1);
+		reg1=NULL;
+	}
+
+	if (gr_fail && uid_fail)
+		return logger(LOG_ERR, "Both user and group authentication failed");
+
+	for (i = 0; i < cmd->nopts; i++) {
+		if ((cmd->opts[i][0] != '$') || ((cp = strchr(cmd->opts[i], '=')) == NULL))
+			continue;
+		if (cmd->opts[i][1] != '*') {
+			for (np = cmd->opts[i] + 1; np != cp; np++) 
+			if (!isdigit(*np)) break;
+			if (np != cp) continue;
+		} else {
+			if (cmd->opts[i][2] != '=') continue;
+			np = cmd->opts[i] + 3;
+			for (j = num+1; j < argc; j++) {
+				cp = np;
+				for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
+				char regstr[MAXSTRLEN];
+					
+					strcpy(regstr, "^(");
+					strcat(regstr, str);
+					strcat(regstr, ")$");
+
+					if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+					if (regexec(reg1,argv[j]) == 1) break;
+				}
+				if (cp == NULL) return logger(LOG_ERR, "Argument %i (%s) did not pass wildcard constraint", j, argv[j]);
+			}
+		}
+		if(reg1 != NULL){
+			free(reg1);
+			reg1=NULL;
+		}
+
+		strncpy(str, cmd->opts[i] + 1, cp - cmd->opts[i] - 1);
+		str[cp - cmd->opts[i] - 1] = '\0';
+		val = atoi(str);
+
+		if (val >= argc) continue;
+
+		cp++;
+		np = cp;
+		if (reg2 != NULL) {
+			for (cp=GetField(cp, str, MAXSTRLEN); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN)) {
+				regsub(reg2, str, buf);
+				if (strcmp(buf, argv[val]) == 0)
+				break;
+			}
+			if (cp != NULL)
+			continue;
+
+			free(reg2);
+			reg2 = NULL;
+		}
+
+		if ((reg2 == NULL) || (cp == NULL)) {
+			cp = np;
+			for (cp=GetField(cp, str, MAXSTRLEN - 5); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN - 5)) {
+			char regstr[MAXSTRLEN];
+
+				strcpy(regstr, "^(");
+				strcat(regstr, str);
+				strcat(regstr, ")$");
+
+				if ((reg2=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+				if (regexec(reg2,argv[val]) == 1) break;
+
+				free(reg2);
+				reg2 = NULL;
+			}
+		}
+		if (cp == NULL) return logger(LOG_ERR, "Argument '%s' did not pass constraint '%s'", argv[val], np);
+	}
+	return 0;
 }
 
-Go(cmd, num, argc, argv)
+/*
+*/
+char *str_replace(const char *source, int offset, int length, const char *paste) {
+char *buffer = malloc(strlen(source) - length + strlen(paste) + 1);
+
+	strncpy(buffer, source, offset);
+	buffer[offset] = 0;
+	strcat(buffer, paste);
+	strcat(buffer, source + offset + length);
+	return buffer;
+}
+
+int Go(cmd, num, argc, argv)
 cmd_t	*cmd;
 int	argc;
 int	num;
@@ -448,57 +613,65 @@ char	**argv;
 	char		*cp, *np;
 	struct passwd	*pw;
 	struct group	*gr;
-	int		ngroups, gidset[256];
+	int		ngroups;
+	gid_t gidset[256];
 	int		curenv = 0, curarg = 0;
 	char		*new_envp[MAXENV];
 	char		*new_argv[MAXARG];
-	char		str[MAXSTRLEN], buf[4*MAXSTRLEN];
+	char		str[MAXSTRLEN];
 
 	if ((cp = FindOpt(cmd, "uid")) == NULL) {
 		if (setuid(0) < 0)
-			fatal("Unable to set uid to default", cp);
+			fatal(1, "Unable to set uid to default");
 	} else {
 		if ((pw = getpwnam(cp)) == NULL) {
 			if (setuid(atoi(cp)) < 0)
-				fatal("Unable to set uid to %s", cp);
+				fatal(1, "Unable to set uid to %s", cp);
 		}
-		if (setuid(pw->pw_uid) < 0)
-			fatal("Unable to set uid to %s", cp);
+		if (setuid(pw->pw_uid) < 0) {
+			fatal(1, "Unable to set uid to %s", cp);
+		}
 	}
 
 	if ((cp = FindOpt(cmd, "gid")) == NULL) {
 		;		/* don't have a default */
 	} else {
-		for (cp=GetField(cp, str); cp!=NULL; cp=GetField(cp, str)) {
+		for (cp=GetField(cp, str, MAXSTRLEN); cp!=NULL; cp=GetField(cp, str, MAXSTRLEN)) {
 			if ((gr = getgrnam(cp)) != NULL)
 				gidset[ngroups++] = gr->gr_gid;
 		}
-		if (ngroups == 0) 
-			fatal("Unable to setgid to any group");
-		if (setgroups(ngroups, gidset) < 0)
-			fatal("Set group failed");
+		if (ngroups == 0)  {
+			fatal(1, "Unable to setgid to any group");
+		}
+		if (setgroups(ngroups, gidset) < 0) {
+			fatal(1, "Set group failed");
+		}
 	}
 
 	if ((cp = FindOpt(cmd, "umask")) == NULL) {
-		if (umask(0022) < 0)
-			fatal("Unable to set umask to default");
+		if (umask(0022) < 0) {
+			fatal(1, "Unable to set umask to default");
+		}
 	} else {
-		if (umask(atov(cp, 8)) < 0)
-			fatal("Unable to set umask to %s", cp);
+		if (umask(atov(cp, 8)) < 0) {
+			fatal(1, "Unable to set umask to %s", cp);
+		}
 	}
 
 	if ((cp = FindOpt(cmd, "chroot")) == NULL) {
 		;		/* don't have a default */
 	} else {
-		if (chroot(cp) < 0)
-			fatal("Unable to chroot to %s", cp);
+		if (chroot(cp) < 0) {
+			fatal(1, "Unable to chroot to %s", cp);
+		}
 	}
 
 	if ((cp = FindOpt(cmd, "dir")) == NULL) {
 		;		/* don't have a default */
 	} else {
-		if (chdir(cp) < 0) 
-			fatal("Unable to chdir to %s", cp);
+		if (chdir(cp) < 0) {
+			fatal(1, "Unable to chdir to %s", cp);
+		}
 	}
 
 	if (FindOpt(cmd, "environment") == NULL) {
@@ -542,8 +715,7 @@ char	**argv;
 		if (environ[i] != NULL)
 			new_argv[curarg++] = environ[i] + 6;
 		else {
-			fprintf(stderr,"No shell\n");
-			exit(1);
+			fatal(1, "No shell");
 		}
 
 		if (argc != 1) {
@@ -553,8 +725,7 @@ char	**argv;
 				len += strlen(argv[i]) + 1;
 
 			if ((cp = (char *)malloc(len + 10)) == NULL) {
-				fprintf(stderr, "Unable to create buffer");
-				exit(1);
+				fatal(1, "Unable to create buffer");
 			}
 
 			len = 0;
@@ -570,49 +741,106 @@ char	**argv;
 		for (i = 0; i < cmd->nargs; i++) {
 			np = cmd->args[i];
 
+			/* Match whole arguments */
+			if (*np == '$') {
+				cp = np = np + 1;
+
+				if (*cp == '*' && cp[1] == 0) {
+					for (j = num + 1; j < argc; j++) {
+						new_argv[curarg++] = argv[j];
+					}
+					continue;
+				}
+
+				while (isdigit(*cp)) ++cp;
+
+				/* Huh? */
+				if (cp == np)  {
+					new_argv[curarg++] = cmd->args[i];
+					continue;
+				}
+
+				/* Full match... */
+				if (!*cp)  {
+					strncpy(str, np, cp - np);
+					str[cp - np] = '\0';
+					val = atoi(str);
+
+					new_argv[curarg++] = argv[val];
+					continue;
+				}
+			}
+
+			/* Embedded match */
 			while ((cp = strchr(np, '$')) != NULL) {
 				if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
 					np = cp + 1;
-				else
-					break;
+				else {
+				char *tmp;
+
+					np = cp + 1;
+					++cp;
+
+					if (*cp == '*') {
+					int len = 0;
+					char *buffer;
+
+						++cp;
+						for (j = num + 1; j < argc; j++)
+							len += strlen(argv[j]) + 1;
+
+						buffer = malloc(len);
+						buffer[0] = 0;
+
+						for (j = num + 1; j < argc; j++) {
+							strcat(buffer, argv[j]);
+							if (j < argc - 1) strcat(buffer, " ");
+						}
+						tmp = str_replace(cmd->args[i],
+							np - cmd->args[i] - 1, cp - np + 1, buffer);
+						cp = tmp + (cp - cmd->args[i]);
+						np = cp;
+						cmd->args[i] = tmp;
+					} else {
+						while (isdigit(*cp)) ++cp;
+
+						/* Huh? */
+						if (cp == np)  {
+							new_argv[curarg++] = cmd->args[i];
+							continue;
+						}
+
+						strncpy(str, np, cp - np);
+						str[cp - np] = '\0';
+						val = atoi(str);
+
+						tmp = str_replace(cmd->args[i],
+							np - cmd->args[i] - 1, cp - np + 1, argv[val]);
+						cp = tmp + (cp - cmd->args[i]);
+						np = cp;
+						cmd->args[i] = tmp;
+					}
+				}
 			}
 
 			if (cp == NULL) {
 				new_argv[curarg++] = cmd->args[i];
 				continue;
 			}
-			if (*(cp+1) == '*') {
-				for (j = num + 1; j < argc; j++) {
-					new_argv[curarg++] = argv[j];
-				}
-				continue;
-			}
-
-			cp++;
-			np = cp;
-			while (isdigit(*cp))
-				cp++;
-			if ((cp - np) == 0) {
-				new_argv[curarg++] = cmd->args[i];
-				continue;
-			}
-			strncpy(str, np, cp - np);
-			str[cp - np] = '\0';
-			val = atoi(str);
-			buf[0] = '\0';
-			strncpy(buf, cmd->args[i], np - cmd->args[i] - 1);
-			strcat(buf, argv[val]);
-			strcat(buf, cp);
-			new_argv[curarg++] = savestr(buf);
 		}
 	}
 	new_argv[curarg] = NULL;
 
+/*	for (i = 0; i < curarg; ++i)
+		printf("arg[%i] = '%s'\n", i, new_argv[i]);*/
+
+	logger(LOG_INFO, "SUCCESS");
 	if (execve(new_argv[0], new_argv, new_envp) < 0)
 		perror("execve");
+	return 0;
 }
 
-output(cmd)
+void output(cmd)
 cmd_t	*cmd;
 {
 	int	i;
@@ -627,46 +855,80 @@ cmd_t	*cmd;
 	printf("\n");
 }
 char
-*format_cmd(argc,argv,retbuf) 
+*format_cmd(int argc, char **argv, char *retbuf, int buflen) 
 /*   
      Format command and args for printing to syslog
      If length (command + args) is too long, try length(command). If THATS
      too long, return an error message.
 */
-int     argc;
-char	**argv;
-char    *retbuf;
 {   
-  int	i,l=0,s,ss,m=0;
-  char *buf =0;
-  s = strlen(argv[0]);
-  if ((s>MAXSTRLEN) ){
-    retbuf=strcpy(retbuf,"unknown cmd (name too long in format_cmd)");
-    return(retbuf);
-  }
-  ss=s;
-  for (i = 1; i < argc; i++) { 
-    l=strlen(argv[i]);
-    m=l>m?l:m;
-    s+=l;
-  }
-  if (l) s+=argc-1; /* count spaces if there are arguments*/
-  if (s > MAXSTRLEN){ /* Ooops, we've gone over. */
-    s=ss; /* Just print command name */
-    m=0;
-    argc=0;
-  }
-  sprintf(retbuf,"%s",argv[0]);
-  if (m)
-    buf=(char *)malloc(m);
-  if (buf) {
-    for (i = 1; i < argc; i++) {
-      sprintf(buf," %s",argv[i]);
-      strcat(retbuf,buf);
-    }
-    free(buf);
-  }
-  return(retbuf);
+int	i,l=0,s,ss,m=0;
+char *buf =0;
+
+	s = strlen(argv[0]);
+	if ((s>MAXSTRLEN) ){
+		retbuf=strcpy(retbuf,"unknown cmd (name too long in format_cmd)");
+		return(retbuf);
+	}
+	ss=s;
+	for (i = 1; i < argc; i++) { 
+		l=strlen(argv[i]);
+		m=l>m?l:m;
+		s+=l;
+	}
+	if (l) s+=argc-1; /* count spaces if there are arguments*/
+	if (s > MAXSTRLEN){ /* Ooops, we've gone over. */
+		s=ss; /* Just print command name */
+		m=0;
+		argc=0;
+	}
+/*	sprintf(retbuf,"%s",argv[0]);*/
+	strcpy(retbuf, "");
+	if (m) buf=(char *)malloc(m + 2);
+	if (buf) {
+		for (i = 1; i < argc; i++) {
+			sprintf(buf," %s",argv[i]);
+			strcat(retbuf,buf);
+		}
+		free(buf);
+	}
+	return(retbuf);
 }
 
+int vlogger(unsigned level, const char *format, va_list args) {
+char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
+char *username = "unknown";
+
+	if (realuser) username = realuser->pw_name;
+
+	vsnprintf(buffer2, MAXSTRLEN, format, args);
+	if (level & LOG_PRINT) printf("%s\n", buffer2);
+	level &= ~LOG_PRINT;
+	snprintf(buffer, MAXSTRLEN, "%s =>%s: %s", username, 
+		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
+		buffer2);
+	syslog(level, "%s", buffer);
+	return -1;
+}
+
+int logger(unsigned level, const char *format, ...) {
+va_list va;
+
+	va_start(va, format);
+	vlogger(level, format, va);
+	va_end(va);
+	return -1;
+}
+
+void fatal(int logit, const char *format, ...) {
+char buffer[MAXSTRLEN];
+va_list	ap;
+
+	va_start(ap, format);
+	vsnprintf(buffer, MAXSTRLEN, format, ap);
+	fprintf(stderr, "%s\n", buffer);
+	if (logit) logger(LOG_ERR, "%s", buffer);
+	va_end(ap);
+	exit(1);
+}
 

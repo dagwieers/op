@@ -41,7 +41,7 @@ distribution to get an idea of its semantics. Next, edit the Makefile
 and remove comments from  the lines appropriate to your
 architecture. 
 
-If you have shadow passwords, define the SHADOW symbol to build in
+If you have shadow passwords, define the USE_SHADOW symbol to build in
 Solaris style shadow support. This also works on Linux 2.0.30. Shadow
 passwords on other architectures have not been tested and are not
 supported. If you successfully port op to another platform's shadow
@@ -78,5 +78,5 @@ long last.
 	Ditto for my contributions which are Copyright (C) 1995, 1997 by
 	Howard Owen. (hbo@egbok.com)
 
-
+	And again for contributions by me, Alec Thomas, Copyright (C) 2002-2004.
 

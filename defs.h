@@ -16,7 +16,21 @@ typedef struct cmd_s {
 	struct cmd_s	*next;
 } cmd_t;
 
-extern cmd_t	*First, *Build();
+typedef struct var_s {
+	char *name, *value;
+	struct var_s *next;
+} var_t;
 
-#define MAXSTRLEN	256
-#define OP_ACCESS	"/usr/local/etc/op.access"
+extern cmd_t	*First, *Build();
+extern var_t	*Variables;
+
+void fatal(int logit, const char *format, ...);
+int logger(unsigned flags, const char *format, ...);
+
+int ReadFile(char *file);
+int CountArgs(cmd_t *cmd);
+int atov(char *str, int type);
+
+#define MAXSTRLEN	2048
+#define OP_ACCESS	"/etc/op.conf"
+#define VERSION     "1.1.9"

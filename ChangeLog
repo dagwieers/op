@@ -1,0 +1,72 @@
+
+Dave Koblas added the keyword "password" to the list of options
+accepted by op. This requires the user to supply op with a password
+before executing the command.  The password can be specified in the
+op.access file (with "password=") or the user's personal password may
+be required.
+
+Howard Owen added the keyword "securid" to the list of options
+accepted by op. This functions similarly to the "password" option,
+requiring the user to supply op with his or her current SecurID code before
+executing the command. If op is compiled without SecurID support, use
+of this option in op.access will result in an error message and a
+refusal to execute the corresponding command.
+
+Alec Thomas added support for user@host and group@host based access, as well
+as variable expansion in options.
+
+November 22nd 1997 - op 1.1.1
+===============================
+Break shadow support out from Solaris support. Added SHADOW symbol to the 
+build. It works on Linux 2.0.30. Presumably it still works on Solaris. 8)
+
+Cleaned up logging code. It was an uncomfortable mess. Slimmed it down some.
+
+September 13th 2002 - op 1.1.2
+==============================
+Added user@host and group@host based access as well as variable expansion.
+Changed SHADOW to USE_SHADOW so it doesn't conflict with system defines.
+
+April 10th 2003 - op 1.1.3
+==========================
+Added a max length arugment to GetField to help prevent buffer overflows.
+Regular expressions always have ^ prepended and $ appended so that if you put
+'a' in an rx field it will not match any string with an 'a'. Old behaviour can
+be emulated with '.*a.*'.
+Added expiration support to users (user[@host][/expiry]).
+
+April 16th 2003 - op 1.1.4
+==========================
+Added basic quoted argument passing to exec commands. This allows for complex
+shell scripts:
+
+	inetd /bin/sh -c '
+			case $1 in
+				on) /usr/sbin/inetd -s ;;
+				off) /usr/bin/pkill inetd ;;
+			esac
+			';
+		users=ROOTUSERS
+		$1=on|off
+
+April 17th 2003 - op 1.1.5
+==========================
+Added extensive logging to op. All logging is sent to syslog as auth.notice.
+
+22/07/03 - op 1.1.6
+===================
+Added PAM support.
+
+28/10/03 - op 1.1.7
+===================
+Logging now uses auth.level, and level is actually useful.
+
+06/11/03 - op 1.1.8
+===================
+Fixed a fairly substantial bug where command arguments with multiple variables
+were not being expanded at all.
+
+24/01/04 - op 1.1.9
+===================
+Trapping signals (SIGINT, etc.) so that a failed authentication attempt can not
+be broken out of.
