@@ -359,7 +359,7 @@ char            input[64],*p;
 
 	if ((pw = getpwuid(getuid())) == NULL) return -1;
 
-	#ifdef SECURID
+#ifdef SECURID
 	if ((cp=FindOpt(cmd, "securid")) != NULL) {
 		memset(&sd_dat, 0, sizeof(sd_dat));   /* clear sd_auth struct */
 		sd = &sd_dat;
@@ -369,11 +369,11 @@ char            input[64],*p;
 		}
 		if (sd_auth(sd)) return -1;
 	}
-	#else
+#else
 	if ((cp=FindOpt(cmd, "securid")) != NULL) {
 		return logger(LOG_ERR | LOG_PRINT, "SecureID not supported by op. Access denied");
 	}
-	#endif	
+#endif	
 
 	if ((cp=FindOpt(cmd, "password")) != NULL) {
 #ifdef USE_PAM
@@ -404,13 +404,13 @@ char            input[64],*p;
 			if (strcmp(crypt(np, str), str) != 0)
 				return logger(LOG_ERR, "Incorrect direct password");
 		} else {
-			#ifdef USE_SHADOW
+#ifdef USE_SHADOW
 			if (strcmp(pw->pw_passwd,"x")==0){ /* Shadow passwords */
 				if ((spw = getspnam(pw->pw_name)) == NULL)
 					return logger(LOG_ERR, "No shadow entry for '%s'", pw->pw_name);
 				pw->pw_passwd=spw->sp_pwdp;
 			}
-			#endif
+#endif
 
 			if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
 				return logger(LOG_ERR, "Invalid user password");
@@ -1033,18 +1033,34 @@ char *buf =0;
 	return(retbuf);
 }
 
+#ifndef HAVE_SNPRINTF
+#warning You have not compiled op with snprintf support, presumably because
+#warning your system does not have it. This leaves op potentially open to
+#warning buffer overflows.
+#endif
+
 int vlogger(unsigned level, const char *format, va_list args) {
 char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
 char *username = "unknown";
 
 	if (realuser) username = realuser->pw_name;
 
+#ifdef HAVE_SNPRINTF
 	vsnprintf(buffer2, MAXSTRLEN, format, args);
+#else
+	vsprintf(buffer2, format, args);
+#endif
 	if (level & LOG_PRINT) printf("%s\n", buffer2);
 	level &= ~LOG_PRINT;
+#ifdef HAVE_SNPRINTF
 	snprintf(buffer, MAXSTRLEN, "%s =>%s: %s", username, 
 		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
 		buffer2);
+#else
+	sprintf(buffer, "%s =>%s: %s", username, 
+		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
+		buffer2);
+#endif
 	syslog(level, "%s", buffer);
 	return -1;
 }
@@ -1063,7 +1079,11 @@ char buffer[MAXSTRLEN];
 va_list	ap;
 
 	va_start(ap, format);
+#ifdef HAVE_SNPRINTF
 	vsnprintf(buffer, MAXSTRLEN, format, ap);
+#else
+	vsprintf(buffer, format, ap);
+#endif
 	fprintf(stderr, "%s\n", buffer);
 	if (logit) logger(LOG_ERR, "%s", buffer);
 	va_end(ap);
