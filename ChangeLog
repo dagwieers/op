@@ -107,3 +107,8 @@ exported to the destination users X authority database. eg.
 
 To enable xauth support, the preprocessor macro XAUTH must be defined as
 a string pointing to the FULL PATH to the xauth binary.
+
+04/05/04 - op 1.23
+==================
+The xauth modifier now updates $XAUTHORITY in the child environment.
+Fixed a bug when setting the GID explicitly.
