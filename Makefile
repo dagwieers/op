@@ -87,4 +87,4 @@ pkg: op
 	(umask 022; mkdir -p pkg/usr/bin pkg/usr/share/man/man1; mv op pkg/usr/bin; cp op.1 pkg/usr/share/man/man1; strip pkg/usr/bin/op; chown -R root:root pkg; chmod 4755 pkg/usr/bin/op; chmod 644 pkg/usr/share/man/man1/op.1)
 
 dist: clean
-	(V=`grep VERSION defs.h  | cut -d\" -f2`; rm -rf pkg; rm -f op-$$V.tar.gz; cd .. && mv op op-$$V && tar cfzv op-$$V.tar.gz op-$$V && mv op-$$V op && mv op-$$V.tar.gz op)
+	(V=`grep VERSION defs.h  | cut -d\" -f2`; rm -rf pkg; rm -f op-$$V.tar.gz; cd .. && mv op op-$$V && tar --exclude '.*.swp' -czv -f op-$$V.tar.gz op-$$V && mv op-$$V op && mv op-$$V.tar.gz op)
