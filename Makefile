@@ -22,7 +22,7 @@ INSTALL-MAN =install -o $(MANOWN) -g $(MANGRP) -m $(MANMODE) op.$(MANEXT) $(MAND
 # Linux 2.0.30
 #
 #OPTS= -DUSE_SHADOW -g
-OPTS= -DUSE_PAM -g
+OPTS= -DXAUTH=\"/usr/X11R6/bin/xauth\" -DUSE_PAM -g
 LDFLAGS = -g
 #
 #

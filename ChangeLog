@@ -97,3 +97,13 @@ Added netgroup support. eg.
 	shell /bin/su -; netgroup=op-shell environment
 
 This is very useful in conjunction with either LDAP or NIS based netgroups.
+
+03/05/04 - op 1.22
+==================
+Added xauth support. This allows the X authority for the current display to be
+exported to the destination users X authority database. eg.
+
+	shell  /bin/su -; users=athomas $TERM xauth password
+
+To enable xauth support, the preprocessor macro XAUTH must be defined as
+a string pointing to the FULL PATH to the xauth binary.
