@@ -1202,7 +1202,7 @@ regdump( regexp *r )
 static char *
 regprop( char *op )
 {
-	register char *p;
+	register char *p = NULL;
 	static char buf[50];
 
 	(void) strcpy(buf, ":");

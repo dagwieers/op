@@ -18,7 +18,7 @@ operation can be carefully controlled.
 .PP
 Configuration entries are read from
 .B /etc/op.conf
-and all files in
+and all files in lexical order from
 .B /etc/op.d
 with the extension
 .B .conf.
@@ -161,6 +161,11 @@ the caller's shell.
 .TP
 .B environment
 Disables the destruction of the users environment.
+.TP
+.B nolog
+Disables informational logging per command. Useful for cron jobs to avoid
+spamming the logs. Note that authentication failures and other errors will
+still be logged.
 .TP
 .B xauth
 Attempt to propagate the X authority entry for the current display to the new

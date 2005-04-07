@@ -96,7 +96,12 @@ DIR *d;
 	if ((d = opendir(dir)) != NULL)
 	{
 	struct dirent *f;
-	int successes = 0;
+	int i, successes = 0, dir_entries = 0, dir_capacity = 32;
+	char **dir_list;
+
+		if (!(dir_list = malloc(sizeof(char*) * dir_capacity)))
+			fatal(1, "failed to malloc space for directory entries");
+		memset(dir_list, 0, sizeof(char*) * dir_capacity);
 
 		while ((f = readdir(d)))
 		{
@@ -109,10 +114,15 @@ DIR *d;
 #else
 			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, f->d_name);
 #endif
-			if (ReadFile(full_path))
-				++successes;
+			if (!(dir_list[dir_entries] = strdup(full_path)))
+				fatal(1, "failed to malloc space for directory entry");
+			++dir_entries;
 		}
 		closedir(d);
+		qsort(dir_list, dir_entries, sizeof(char*),
+			(int(*)(const void *, const void *))strcmp);
+		for (i = 0; i < dir_entries; ++i)
+			if (ReadFile(dir_list[i])) successes++;
 		return successes;
 	}
 	return 0;
@@ -841,6 +851,10 @@ char	**argv;
 		}
 	}
 
+	if (FindOpt(cmd, "nolog") != NULL) {
+		minimum_logging_level = LOG_NOTICE;
+	}
+
 	if (FindOpt(cmd, "environment") == NULL) {
 		for (i = 0; i < cmd->nopts; i++) {
 			if (cmd->opts[i][0] != '$')
@@ -1073,9 +1087,13 @@ char *buf =0;
 #warning buffer overflows.
 #endif
 
+unsigned minimum_logging_level = LOG_INFO;
+
 int vlogger(unsigned level, const char *format, va_list args) {
 char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
 char *username = "unknown";
+
+	if (level >= minimum_logging_level) return -1;
 
 	if (realuser) username = realuser->pw_name;
 
