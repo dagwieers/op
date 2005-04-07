@@ -89,6 +89,11 @@ void Usage()
 			gargv[0], gargv[0]);
 }
 
+int file_compare(const void *a, const void *b)
+{
+	return strcmp(*(char**)a, *(char**)b);
+}
+
 int ReadDir( char *dir )
 {
 DIR *d;
@@ -101,28 +106,31 @@ DIR *d;
 
 		if (!(dir_list = malloc(sizeof(char*) * dir_capacity)))
 			fatal(1, "failed to malloc space for directory entries");
-		memset(dir_list, 0, sizeof(char*) * dir_capacity);
 
 		while ((f = readdir(d)))
 		{
-		char full_path[PATH_MAX];
-
 			if (f->d_name[0] == '.' || (strlen(f->d_name) > 5 && strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
 				continue;
-#ifdef HAVE_SNPRINTF
-			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, f->d_name);
-#else
-			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, f->d_name);
-#endif
-			if (!(dir_list[dir_entries] = strdup(full_path)))
+			if (dir_entries >= dir_capacity) {
+				dir_capacity += 32;
+				if (!(dir_list = realloc(dir_list, sizeof(char*) * dir_capacity)))
+					fatal(1, "reallocation of directory entry list failed");
+			}
+			if (!(dir_list[dir_entries] = strdup(f->d_name)))
 				fatal(1, "failed to malloc space for directory entry");
 			++dir_entries;
 		}
 		closedir(d);
-		qsort(dir_list, dir_entries, sizeof(char*),
-			(int(*)(const void *, const void *))strcmp);
-		for (i = 0; i < dir_entries; ++i)
-			if (ReadFile(dir_list[i])) successes++;
+		qsort(dir_list, dir_entries, sizeof(char*), file_compare);
+		for (i = 0; i < dir_entries; ++i) {
+		char full_path[PATH_MAX];
+#ifdef HAVE_SNPRINTF
+			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, dir_list[i]);
+#else
+			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, dir_list[i]);
+#endif
+			if (ReadFile(full_path)) successes++;
+		}
 		return successes;
 	}
 	return 0;
