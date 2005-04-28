@@ -50,8 +50,8 @@ NWS		[^ \n\t;]+
 				BEGIN ARGS; }
 ^{WS}			BEGIN ARGS;
 <ARGS>";"		state++;
-<ARGS>'(\\.|[^'])*'	addquotedarg(state, cmd, yytext);
-<ARGS>\"(\\.|[^\"])*\"	addquotedarg(state, cmd, yytext);
+<ARGS>([^ \n\t'"]*'(\\.|[^'])*')+	addquotedarg(state, cmd, yytext);
+<ARGS>([^ \n\t'"]*\"(\\.|[^\"])*\")+	addquotedarg(state, cmd, yytext);
 <ARGS>{NWS}		addarg(state, cmd, yytext);
 <ARGS>{WS}		;
 %%
@@ -175,13 +175,17 @@ const char *eq = strchr(str, '=');
 
 static void addquotedarg(int state, cmd_t *cmd, const char *instr) {
 char buffer[MAXSTRLEN];
-int i, o;
+int i, o, q;
 
 	if (strlen(instr) + 2 > MAXSTRLEN) {
 		fatal(1, "Quoted argument too long\n");
 		exit(1);
 	}
-	for (o = 0, i = 1; instr[i] != instr[0]; ++i, ++o) {
+	for (o = 0; !strchr("'\"", instr[o]); ++o)
+		buffer[o] = instr[o];
+	q = o;
+
+	for (i = o + 1; instr[i] && instr[i] != instr[q]; ++i, ++o) {
 		if (instr[i] == '\\') {
 		int c = instr[++i];
 

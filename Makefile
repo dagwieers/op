@@ -84,7 +84,7 @@ OPTS += -DHAVE_SNPRINTF
 #
 CFLAGS= $(OPTS) $(INC) $(GLOBALOPTS) $(SECURID)
 REG = regexp.o
-OBJ = lex.o main.o atov.o $(REG)
+OBJ = lex.o util.o main.o atov.o $(REG)
 op: $(OBJ) op.list
 	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $(LDFLAGS) $(SECURIDLIBDIR) $(OBJ) $(SECURIDLIB) $(LIBS)
 clean:
