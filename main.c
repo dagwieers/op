@@ -74,7 +74,10 @@ char    *format_cmd(int argc, char **argv, char *retbuf, int buflen);
 char    *GetCode();
 cmd_t	*Find();
 int Verify(cmd_t *cmd, int num, int argc, char **argv);
+int VerifyPermissions(cmd_t *cmd);
 cmd_t	*Find(char *name);
+char	*FindOpt(cmd_t *cmd, char *str);
+void	ListCommands();
 int Go(cmd_t *cmd, int num, int argc, char **argv);
 cmd_t	*First = NULL;
 var_t	*Variables = NULL;
@@ -85,13 +88,68 @@ sigset_t sig_mask, old_sig_mask;
 
 void Usage()
 {
-	fatal(0, "Usage: %s mnemonic [args]\n       %s -V -H [-u username] mnemonic",
-			gargv[0], gargv[0]);
+	fatal(0,	"Usage: %s mnemonic [args]\n"
+				"       %s -l     List available commands\n"
+				"       %s -V     Show op version",
+			gargv[0], gargv[0], gargv[0]);
 }
 
-int file_compare(const void *a, const void *b)
+int FileCompare(const void *a, const void *b)
 {
 	return strcmp(*(char**)a, *(char**)b);
+}
+
+int SortCommandList(const void *a, const void *b)
+{
+	return strcmp((*(cmd_t**)a)->name, (*(cmd_t**)b)->name);
+}
+
+void ListCommands()
+{
+cmd_t *cmd;
+array_t *cmds = array_alloc();
+int length = 0, i;
+
+	/*	first pass, get maximum command length and number of commands we have
+		permission to use */
+	for (cmd = First; cmd != NULL; cmd = cmd->next) {
+		if (strcmp(cmd->name, "DEFAULT") && VerifyPermissions(cmd) >= 0) {
+		int l = strlen(cmd->name);
+
+			for (i = 0; i < cmds->size; ++i)
+				if (!strcmp(((cmd_t*)cmds->data[i])->name, cmd->name))
+					break;
+			if (i == cmds->size) {
+				if (l > length) length = l;
+				array_push(cmds, cmd);
+			}
+		}
+	}
+
+	qsort(cmds->data, cmds->size, sizeof(void*), SortCommandList);
+
+	/* second pass, display */
+	for (i = 0; i < cmds->size; ++i) {
+		cmd = cmds->data[i];
+
+		if (!strcmp(cmd->name, "DEFAULT")) continue;
+
+		if (VerifyPermissions(cmd) >= 0) {
+		char *help = FindOpt(cmd, "help");
+
+			if (!help || !*help) help = "(no help available)";
+			printf("%-*s", length + 2, cmd->name);
+			while (*help) {
+			int j;
+
+				printf("%-*.*s\n", 77 - length, 77 - length, help);
+				for (j = 0; j < 77 - length && *help; ++j, ++help) ;
+				if (j == 77 - length)
+					printf("%-*s", length + 2, "");
+			}
+		}
+	}
+	array_free(cmds);
 }
 
 int ReadDir( char *dir )
@@ -101,33 +159,24 @@ DIR *d;
 	if ((d = opendir(dir)) != NULL)
 	{
 	struct dirent *f;
-	int i, successes = 0, dir_entries = 0, dir_capacity = 32;
-	char **dir_list;
-
-		if (!(dir_list = malloc(sizeof(char*) * dir_capacity)))
-			fatal(1, "failed to malloc space for directory entries");
+	int i, successes = 0;
+	array_t *dir_list = array_alloc();
 
 		while ((f = readdir(d)))
 		{
 			if (f->d_name[0] == '.' || (strlen(f->d_name) > 5 && strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
 				continue;
-			if (dir_entries >= dir_capacity) {
-				dir_capacity += 32;
-				if (!(dir_list = realloc(dir_list, sizeof(char*) * dir_capacity)))
-					fatal(1, "reallocation of directory entry list failed");
-			}
-			if (!(dir_list[dir_entries] = strdup(f->d_name)))
+			if (!array_push(dir_list, savestr(f->d_name)))
 				fatal(1, "failed to malloc space for directory entry");
-			++dir_entries;
 		}
 		closedir(d);
-		qsort(dir_list, dir_entries, sizeof(char*), file_compare);
-		for (i = 0; i < dir_entries; ++i) {
+		qsort(dir_list->data, dir_list->size, sizeof(void*), FileCompare);
+		for (i = 0; i < dir_list->size; ++i) {
 		char full_path[PATH_MAX];
 #ifdef HAVE_SNPRINTF
-			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, dir_list[i]);
+			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
 #else
-			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, dir_list[i]);
+			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
 #endif
 			if (ReadFile(full_path)) successes++;
 		}
@@ -144,7 +193,7 @@ char	**argv;
 	char		user[MAXSTRLEN];
 	cmd_t		*cmd, *def, *new;
 	struct passwd	*pw;
-	int		hflag = 0, read_conf = 0, read_conf_dir = 0;
+	int		lflag = 0, hflag = 0, read_conf = 0, read_conf_dir = 0;
 	char		*uptr = NULL;
 	char		cmd_s[MAXSTRLEN];
 	char            *pcmd_s;
@@ -168,6 +217,9 @@ char	**argv;
 		if (strcmp("-V", argv[argStart]) == 0) {
 			printf("%s\n", VERSION);
 			return 0;
+		} else if (strcmp("-l", argv[argStart]) == 0) {
+			lflag++;
+			argStart++;
 		} else if (strcmp("-H", argv[argStart]) == 0) {
 			hflag++;
 			argStart++;
@@ -214,6 +266,16 @@ char	**argv;
 	if (!read_conf && !read_conf_dir)
 		fatal(1, "Could not open %s or any configuration files in %s", OP_ACCESS, OP_ACCESS_DIR);
 
+	if ((pw = getpwuid(getuid())) == NULL) 
+		exit(1);
+	realuser = getpwuid(getuid());
+	strncpy(user, pw->pw_name, MAXSTRLEN);
+
+	if (lflag) {
+		ListCommands();
+		return 0;
+	}
+
 	if (hflag) {
 		if (uptr != NULL) {
 			if (getuid() != 0) 
@@ -245,10 +307,6 @@ char	**argv;
 	if (num <0)
 		num = -num;
 
-	if ((pw = getpwuid(getuid())) == NULL) 
-		exit(1);
-	realuser = getpwuid(getuid());
-	strncpy(user, pw->pw_name, MAXSTRLEN);
 	pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN);
 	if (Verify(new, num, argc, argv) < 0)
 		fatal(0, "Permission denied by op");
@@ -262,7 +320,7 @@ char	*name;
 	cmd_t	*cmd;
 
 	for (cmd = First; cmd != NULL; cmd = cmd ->next) {
-		if (strcmp(cmd->name, name) == 0)
+		if (strcmp(cmd->name, name) == 0 && VerifyPermissions(cmd) >= 0)
 			break;
 	}
 
@@ -352,7 +410,7 @@ char *pass;
 					*response = NULL;
 					return PAM_CONV_ERR;
 				}
-				pr->resp = strdup(pass);
+				pr->resp = savestr(pass);
 			break;
 			case PAM_TEXT_INFO :
 				if (pm->msg)
@@ -383,92 +441,22 @@ char *pass;
 
 #endif
 
-int Verify(cmd, num, argc, argv)
-cmd_t	*cmd;
-int	argc;
-int	num;
-char	**argv;
+int VerifyPermissions(cmd_t *cmd)
 {
 int		gr_fail = 1, uid_fail = 1, netgr_fail = 1;
-int		i, j, val;
-char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN], hostname[HOST_NAME_MAX];
+int		i;
+char		*cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
 regexp		*reg1 = NULL;
-regexp		*reg2 = NULL;
 struct passwd	*pw;
-#ifdef USE_SHADOW
-struct spwd *spw;
-#endif
 #ifdef USE_PAM
 struct pam_conv pamconv = { pam_conversation, NULL };
 pam_handle_t *pam;
 #endif
 struct group	*gr;
-#ifdef SECURID
-struct          SD_CLIENT sd_dat, *sd;
-int             k;
-char            input[64],*p;
-#endif
 
-	if ((pw = getpwuid(getuid())) == NULL) return -1;
-
-#ifdef SECURID
-	if ((cp=FindOpt(cmd, "securid")) != NULL) {
-		memset(&sd_dat, 0, sizeof(sd_dat));   /* clear sd_auth struct */
-		sd = &sd_dat;
-		creadcfg();		/*  accesses sdconf.rec  */
-		if (sd_init(sd)){
-			return logger(LOG_WARNING | LOG_PRINT, "Cannot contact ACE server");
-		}
-		if (sd_auth(sd)) return -1;
-	}
-#else
-	if ((cp=FindOpt(cmd, "securid")) != NULL) {
-		return logger(LOG_ERR | LOG_PRINT, "SecureID not supported by op. Access denied");
-	}
-#endif	
-
-	if ((cp=FindOpt(cmd, "password")) != NULL) {
-#ifdef USE_PAM
-		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
-			if ((np = getpass("Password:")) == NULL)
-				return logger(LOG_ERR, "Could not get user password");
-
-			if (strcmp(crypt(np, str), str) != 0)
-				return logger(LOG_ERR, "Incorrect direct password");
-		} else {
-		int resp;
-
-			resp = pam_start("op", pw->pw_name, &pamconv, &pam);
-			if (resp == PAM_SUCCESS)
-				resp = pam_authenticate(pam, PAM_SILENT);
-			if (resp == PAM_SUCCESS)
-				resp = pam_acct_mgmt(pam, 0);
-			if (resp != PAM_SUCCESS) {
-				return logger(LOG_ERR, "pam_authticate: %s", pam_strerror(pam, resp));
-			}
-			pam_end(pam, resp);
-		}
-#else
-		if ((np = getpass("Password:")) == NULL)
-			return logger(LOG_ERR, "Could not get user password");
-
-		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
-			if (strcmp(crypt(np, str), str) != 0)
-				return logger(LOG_ERR, "Incorrect direct password");
-		} else {
-#ifdef USE_SHADOW
-			if (strcmp(pw->pw_passwd,"x")==0){ /* Shadow passwords */
-				if ((spw = getspnam(pw->pw_name)) == NULL)
-					return logger(LOG_ERR, "No shadow entry for '%s'", pw->pw_name);
-				pw->pw_passwd=spw->sp_pwdp;
-			}
-#endif
-
-			if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
-				return logger(LOG_ERR, "Invalid user password");
-		}
-#endif
-	}
+	/* root always has access - it is pointless refusing */
+	if (getuid() == 0) 
+		return 0;
 
 	if (gethostname(hostname, HOST_NAME_MAX) == -1)
 		return logger(LOG_ERR, "Could not get hostname");
@@ -589,6 +577,96 @@ char            input[64],*p;
 	}
 
 	if (gr_fail && uid_fail && netgr_fail)
+		return -1;
+	return 0;
+}
+
+int Verify(cmd, num, argc, argv)
+cmd_t	*cmd;
+int	argc;
+int	num;
+char	**argv;
+{
+int		i, j, val;
+char		*np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
+regexp		*reg1 = NULL;
+regexp		*reg2 = NULL;
+struct passwd	*pw;
+#ifdef USE_SHADOW
+struct spwd *spw;
+#endif
+#ifdef USE_PAM
+struct pam_conv pamconv = { pam_conversation, NULL };
+pam_handle_t *pam;
+#endif
+#ifdef SECURID
+struct          SD_CLIENT sd_dat, *sd;
+int             k;
+char            input[64],*p;
+#endif
+
+	if ((pw = getpwuid(getuid())) == NULL) return -1;
+
+#ifdef SECURID
+	if ((cp=FindOpt(cmd, "securid")) != NULL) {
+		memset(&sd_dat, 0, sizeof(sd_dat));   /* clear sd_auth struct */
+		sd = &sd_dat;
+		creadcfg();		/*  accesses sdconf.rec  */
+		if (sd_init(sd)){
+			return logger(LOG_WARNING | LOG_PRINT, "Cannot contact ACE server");
+		}
+		if (sd_auth(sd)) return -1;
+	}
+#else
+	if ((cp=FindOpt(cmd, "securid")) != NULL) {
+		return logger(LOG_ERR | LOG_PRINT, "SecureID not supported by op. Access denied");
+	}
+#endif	
+
+	if (getuid() != 0 && (cp=FindOpt(cmd, "password")) != NULL) {
+#ifdef USE_PAM
+		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+			if ((np = getpass("Password:")) == NULL)
+				return logger(LOG_ERR, "Could not get user password");
+
+			if (strcmp(crypt(np, str), str) != 0)
+				return logger(LOG_ERR, "Incorrect direct password");
+		} else {
+		int resp;
+
+			resp = pam_start("op", pw->pw_name, &pamconv, &pam);
+			if (resp == PAM_SUCCESS)
+				resp = pam_authenticate(pam, PAM_SILENT);
+			if (resp == PAM_SUCCESS)
+				resp = pam_acct_mgmt(pam, 0);
+			if (resp != PAM_SUCCESS) {
+				return logger(LOG_ERR, "pam_authticate: %s", pam_strerror(pam, resp));
+			}
+			pam_end(pam, resp);
+		}
+#else
+		if ((np = getpass("Password:")) == NULL)
+			return logger(LOG_ERR, "Could not get user password");
+
+		if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+			if (strcmp(crypt(np, str), str) != 0)
+				return logger(LOG_ERR, "Incorrect direct password");
+		} else {
+#ifdef USE_SHADOW
+			if (strcmp(pw->pw_passwd,"x")==0){ /* Shadow passwords */
+				if ((spw = getspnam(pw->pw_name)) == NULL)
+					return logger(LOG_ERR, "No shadow entry for '%s'", pw->pw_name);
+				pw->pw_passwd=spw->sp_pwdp;
+			}
+#endif
+
+			if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
+				return logger(LOG_ERR, "Invalid user password");
+		}
+#endif
+	}
+
+	if ((i = VerifyPermissions(cmd) < 0))
 		return logger(LOG_ERR, "Both user, group and netgroup authentication failed");
 
 	for (i = 0; i < cmd->nopts; i++) {
@@ -694,6 +772,7 @@ char	**argv;
 	char		*new_envp[MAXENV];
 	char		*new_argv[MAXARG];
 	char		str[MAXSTRLEN];
+	struct stat st;
 
 #ifdef XAUTH
 	if (getenv("DISPLAY") != NULL && (cp = FindOpt(cmd, "xauth")) != NULL) {
@@ -702,7 +781,6 @@ char	**argv;
 	int status;
 	uid_t uid;
 	gid_t gid;
-	struct stat st;
 
 		/* We need to find the destination user's info */
 		if (cp == NULL && (cp = FindOpt(cmd, "uid")) == NULL) {
@@ -929,36 +1007,6 @@ char	**argv;
 		for (i = 0; i < cmd->nargs; i++) {
 			np = cmd->args[i];
 
-			/* Match whole arguments */
-			if (*np == '$') {
-				cp = np = np + 1;
-
-				if (*cp == '*' && cp[1] == 0) {
-					for (j = num + 1; j < argc; j++) {
-						new_argv[curarg++] = argv[j];
-					}
-					continue;
-				}
-
-				while (isdigit(*cp)) ++cp;
-
-				/* Huh? */
-				if (cp == np)  {
-					new_argv[curarg++] = cmd->args[i];
-					continue;
-				}
-
-				/* Full match... */
-				if (!*cp)  {
-					strncpy(str, np, cp - np);
-					str[cp - np] = '\0';
-					val = atoi(str);
-
-					new_argv[curarg++] = argv[val];
-					continue;
-				}
-			}
-
 			/* Embedded match */
 			while ((cp = strchr(np, '$')) != NULL) {
 				if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
@@ -970,12 +1018,12 @@ char	**argv;
 					++cp;
 
 					if (*cp == '*') {
-					int len = 0;
+					int len = 1;
 					char *buffer;
 
 						++cp;
 						/* Find total length of all arguments */
-						for (j = num + 1; j < argc; j++)
+						for (j = 1; j < argc; j++)
 							len += strlen(argv[j]) + 1;
 
 						if ((buffer = malloc(len)) == NULL)
@@ -984,7 +1032,7 @@ char	**argv;
 						buffer[0] = 0;
 
 						/* Expand all arguments */
-						for (j = num + 1; j < argc; j++) {
+						for (j = 1; j < argc; j++) {
 							strcat(buffer, argv[j]);
 							if (j < argc - 1) strcat(buffer, " ");
 						}
@@ -996,21 +1044,15 @@ char	**argv;
 					} else {
 						while (isdigit(*cp)) ++cp;
 
-						/* Huh? */
-						if (cp == np)  {
-							new_argv[curarg++] = cmd->args[i];
-							continue;
+						if (cp != np) {
+							val = atoi(np);
+
+							tmp = str_replace(cmd->args[i],
+								np - cmd->args[i] - 1, cp - np + 1, argv[val]);
+							cp = tmp + (cp - cmd->args[i]) + 1;
+							np = cp;
+							cmd->args[i] = tmp;
 						}
-
-						strncpy(str, np, cp - np);
-						str[cp - np] = '\0';
-						val = atoi(str);
-
-						tmp = str_replace(cmd->args[i],
-							np - cmd->args[i] - 1, cp - np + 1, argv[val]);
-						cp = tmp + (cp - cmd->args[i]);
-						np = cp;
-						cmd->args[i] = tmp;
 					}
 				}
 			}
@@ -1023,14 +1065,16 @@ char	**argv;
 	}
 	new_argv[curarg] = NULL;
 
-/*	for (i = 0; i < curarg; ++i)
-		printf("arg[%i] = '%s'\n", i, new_argv[i]);*/
+	if (stat(new_argv[0], &st) != -1 && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+		logger(LOG_INFO, "SUCCESS");
 
-	logger(LOG_INFO, "SUCCESS");
 	if (sigprocmask(SIG_SETMASK, &old_sig_mask, NULL))
 		fatal(1, "Could not restore signal mask");
-	if (execve(new_argv[0], new_argv, new_envp) < 0)
+	if ((i = execve(new_argv[0], new_argv, new_envp)) < 0) {
 		perror("execve");
+		logger(LOG_ERR, "execve(3) failed with error code %i", i);
+		exit(i);
+	}
 	return 0;
 }
 
@@ -1095,7 +1139,7 @@ char *buf =0;
 #warning buffer overflows.
 #endif
 
-unsigned minimum_logging_level = LOG_INFO;
+unsigned minimum_logging_level = 99;
 
 int vlogger(unsigned level, const char *format, va_list args) {
 char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];

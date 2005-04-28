@@ -15,6 +15,15 @@ operations without having to give them full superuser privileges.
 Different sets of users may access different operations, and the
 security-related aspects of environment of each
 operation can be carefully controlled.
+.SH OPTIONS
+.TP
+.B -V
+Show version number.
+.TP
+.B -l
+List available commands. Note that this will only display commands you are
+permitted to run.
+.SH CONFIGURATION
 .PP
 Configuration entries are read from
 .B /etc/op.conf
@@ -161,6 +170,12 @@ the caller's shell.
 .TP
 .B environment
 Disables the destruction of the users environment.
+.TP
+.B help
+Define help for this mnemonic.
+.I op -l
+will display this help when it lists the available commands. eg.
+.I help="This is some help"
 .TP
 .B nolog
 Disables informational logging per command. Useful for cron jobs to avoid

@@ -24,6 +24,20 @@ typedef struct var_s {
 	struct var_s *next;
 } var_t;
 
+typedef struct array_s {
+	void **data;
+	int size, capacity;
+} array_t;
+
+/* functions to manage a dynamically extensible array of pointers */
+#define ARRAY_CHUNK	32
+array_t *array_alloc();
+void array_free(array_t *array);
+array_t *array_free_contents(array_t *array);
+void *array_push(array_t *array, void *object);
+void *array_pop(array_t *array);
+int array_extend(array_t *array, int capacity);
+
 extern cmd_t	*First, *Build();
 extern var_t	*Variables;
 extern unsigned	minimum_logging_level;
@@ -39,7 +53,7 @@ int atov(char *str, int type);
 #define MAXSTRLEN	2048
 #define OP_ACCESS	"/etc/op.conf"
 #define OP_ACCESS_DIR	"/etc/op.d"
-#define VERSION     "1.28"
+#define VERSION     "1.29"
 
 #define VAR_EXPAND_LEN	8192
 #define	VAR_NAME_LEN	64	
