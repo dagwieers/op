@@ -38,12 +38,14 @@ void *array_push(array_t *array, void *object);
 void *array_pop(array_t *array);
 int array_extend(array_t *array, int capacity);
 
-extern cmd_t	*First, *Build();
+extern cmd_t	*First, *Build(), *BuildSingle();
 extern var_t	*Variables;
 extern unsigned	minimum_logging_level;
 
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
+void strnprintf(char *out, int len, const char *format, va_list ap);
+char *strtolower(char *in);
 
 int ReadFile(char *file);
 int ReadDir(char *dir);
@@ -53,7 +55,7 @@ int atov(char *str, int type);
 #define MAXSTRLEN	2048
 #define OP_ACCESS	"/etc/op.conf"
 #define OP_ACCESS_DIR	"/etc/op.d"
-#define VERSION     "1.29"
+#define VERSION     "1.30"
 
 #define VAR_EXPAND_LEN	8192
 #define	VAR_NAME_LEN	64	

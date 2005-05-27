@@ -3,7 +3,8 @@
 #
 CC=gcc
 INC= -I. -Wall
-LIBS= -ll -L/lib -lcrypt
+LEX = flex
+LIBS= -lfl -L/lib -lcrypt
 DESTDIR=
 PREFIX=/usr
 CONFDIR= $(DESTDIR)/etc/op.d
@@ -26,17 +27,17 @@ OPTS += -g -DDEBUG
 LDFLAGS += -g
 
 # Enable PAM support
-#OPTS += -DUSE_PAM
-#LDFLAGS += -lpam
+OPTS += -DUSE_PAM
+LIBS += -lpam
 
 # Enable shadow support (generally not used in conjunction with PAM)
-OPTS += -DUSE_SHADOW
+#OPTS += -DUSE_SHADOW
 
 # Enable XAUTH support
 OPTS += -DXAUTH=\"/usr/X11R6/bin/xauth\"
 
-# We have snprintf(3)
-OPTS += -DHAVE_SNPRINTF
+# We have vsnprintf(3) (more secure)
+OPTS += -DHAVE_VSNPRINTF
 
 ############################ LEGACY CONFIG ####################################
 #
@@ -97,9 +98,10 @@ install: op
 	mkdir -p $(MANDIR)
 	$(INSTALL-MAN)
 	mkdir -p $(CONFDIR)
+	test -d /etc/pam.d && install -m755 -d ${DESTDIR}/etc/pam.d && install -m644 op.pam ${DESTDIR}/etc/pam.d/op
 
 pkg: op
-	(umask 022; mkdir -p pkg/usr/bin pkg/usr/share/man/man1; mv op pkg/usr/bin; cp op.1 pkg/usr/share/man/man1; strip pkg/usr/bin/op; chown -R root:root pkg; chmod 4755 pkg/usr/bin/op; chmod 644 pkg/usr/share/man/man1/op.1)
+	(umask 022; mkdir pkg; make DESTDIR=${PWD}/pkg install)
 
 dist: clean
 	(V=`grep VERSION defs.h  | cut -d\" -f2`; rm -rf pkg; rm -f op-$$V.tar.gz; cd .. && mv op op-$$V && tar --exclude 'op.list' --exclude '.*.swp' --exclude '.svn' -czv -f op-$$V.tar.gz op-$$V && mv op-$$V op && mv op-$$V.tar.gz op)

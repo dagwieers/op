@@ -166,7 +166,8 @@ case, simply using
 .I $VAR with no = part (as in 
 .B $USER)
 means that this environment variable is inherited unchanged from
-the caller's shell.
+the caller's shell. If the $VAR is an assignment the environment variable
+is set to the specified value in the new environment.
 .TP
 .B environment
 Disables the destruction of the users environment.
@@ -296,6 +297,8 @@ shell
 	environment
 .br
 	password
+.br
+    help="Root shell"
 .PP
 .br
 # 'op reboot' - reboot system
@@ -307,6 +310,8 @@ reboot
 	users=ACCESS_LIST
 .br
 	password
+.br
+    help="Reboot system"
 .PP
 # 'op shutdown <time>' - shutdown at a 
 .br
@@ -321,6 +326,8 @@ shutdown
     users=ACCESS_LIST
 .br
     $1=(now|[0-1]?[0-9]:[0-9][0-9]|2[0-3]:[0-5][0-9]|\+[0-9]+)
+.br
+    help="Shutdown system"
 .PP
 # Switch inetd on and off, shows complex
 .br
