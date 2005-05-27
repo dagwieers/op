@@ -243,16 +243,12 @@ char	*str;
 	return s;
 }
 
-static cmd_t	*newcmd(name)
-char	*name;
+static cmd_t	*alloccmd(char *name)
 {
 	cmd_t	*cmd = (cmd_t *)malloc(sizeof(cmd_t));
 
 	if (cmd == NULL)
 		fatal(1, "Unable to alloc space for new command");
-
-	cmd->next = First;
-	First = cmd;
 
 	cmd->name = savestr(name);
 	cmd->nargs = 0;		cmd->margs = 16;
@@ -264,6 +260,17 @@ char	*name;
 		fatal(1, "Unable to alloc args/opts");
 
 	return cmd;
+}
+
+static cmd_t	*newcmd(char *name)
+{
+	cmd_t	*cmd = alloccmd(name);
+
+	cmd->next = First;
+	First = cmd;
+
+	return cmd;
+
 }
 
 int ReadFile(file)
@@ -379,11 +386,11 @@ cmd_t	*cmd;
 	qsort(cmd->opts, cmd->nopts, sizeof(char *), cmpopts);
 }
 
-cmd_t	*Build(def, cmd)
-cmd_t	*def, *cmd;
+/* Build a new command but don't merge it into the global list */
+cmd_t	*BuildSingle(cmd_t *def, cmd_t *cmd)
 {
-	cmd_t		*new = newcmd("");
-	char		defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
+	cmd_t	*new = alloccmd(cmd->name ? cmd->name : "");
+	char	defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
 	int		i, j;
 #ifndef _AIX
 	extern char	*strchr();
@@ -397,6 +404,8 @@ cmd_t	*def, *cmd;
 		addarg(0, new, cmd->args[i]);
 
 	for (i = 0; i < def->nopts; i++) {
+	int skipped = 0;
+
 		if ((cp = strchr(def->opts[i], '=')) == NULL)
 			strcpy(defname, def->opts[i]);
 		else {
@@ -412,9 +421,12 @@ cmd_t	*def, *cmd;
 				strncpy(optname, cmd->opts[j], l);
 				optname[l] = '\0';
 			}
-			if (strcmp(defname, optname) == 0)
-				def->opts[i][0] = '\0';
+			if (strcmp(defname, optname) == 0) {
+				skipped = 1;
+				break;
+			}
 		}
+		if (skipped) continue;
 		if (def->opts[i][0] != '\0')
 			addarg(1, new, def->opts[i]);
 	}
@@ -422,6 +434,18 @@ cmd_t	*def, *cmd;
 		addarg(1, new, cmd->opts[j]);
 
 	/* sortopts(new); */
+
+	return new;
+}
+
+
+/* Build a new command *and* merge it with the global command list */
+cmd_t	*Build(cmd_t *def, cmd_t *cmd)
+{
+	cmd_t *new = 	BuildSingle(def, cmd);
+
+	new->next = First;
+	First = new;
 
 	return new;
 }

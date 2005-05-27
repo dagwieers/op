@@ -1,0 +1,52 @@
+Building
+========
+To build op, the best option is to override the default Makefile settings
+with ones appropriate for your system (the alternative is to edit the Makefile, 
+uncommenting the appropriate sections).
+
+op requires Flex (it will not work with standard Lex due to internal 
+limitations on data structures in Lex).
+
+Compiler flags are put into OPTS (this is a legacy setting), libraries in LIBS  
+and link flags in LDFLAGS.
+
+Build for typical PAM enabled Linux system:
+  make OPTS='-DXAUTH=\"/usr/X11R6/bin/xauth\" -DUSE_PAM' \
+    LIBS='-lcrypt -lpam -lfl' LDFLAGS='-Wl,-z,now'
+
+Build for typical Solaris system with PAM:
+  make LEX=flex OPTS='-DXAUTH=\"/usr/X/bin/xauth\" -DUSE_PAM' \
+    LIBS='-lcrypt -lpam -lfl'
+
+The available features are:
+
+  Debugging:
+    Compiler flags: -g -DDEBUG
+    Link flags: -g
+
+  PAM:
+    Compiler flags: -DUSE_PAM
+    Libraries: -lpam
+
+  Shadow support:
+    Compiler flags: -DUSE_SHADOW
+    Libraries: -lshadow
+
+  Use Flex:
+    Libraries: -lfl
+
+  XAuth support:
+    Compiler flags: -DXAUTH=\"<full-path-to-xauth>\"
+
+  If you have vsnprintf on your system:
+    Compiler flags: -DHAVE_VSNPRINTF
+
+Note: For SecureID support, read the Makefile and uncomment the appropriate 
+section.
+
+Installing
+==========
+"make install" will do a normal install. Optionally, DESTDIR can be used to 
+install into a package root:
+
+  make DESTDIR=/tmp/pkg install

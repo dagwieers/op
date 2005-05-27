@@ -149,3 +149,22 @@ Cleaned up the code a bit, adding some basic dynamic array functions instead of
 replicating the code across multiple areas.
 
 Closes #4
+
+ 27/05/05- op 1.30
+==================
+Fixed use of DEFAULT section, closes #5. Quite a pain in the arse actually.
+
+Environment variables can now be propagated into child environments even when
+"environment" is specified. This will override any existing variables.
+
+Now using vsnprintf rather than snprintf. Correspondingly, changed preprocessor
+define which may mean build scripts need to be changed.
+
+Added an INSTALL file documenting the usual installation instructions.
+
+Default to using Flex, as Lex has internal constraints.
+
+Added default op.pam which is now installed if /etc/pam.d exists.
+
+Added patches by Pierre fixing strnprintf issues and a wildcard constraint bug.
+Thanks Pierre.

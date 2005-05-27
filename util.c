@@ -1,5 +1,35 @@
+#include <stdio.h>
+#include <ctype.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include "defs.h"
+
+#ifndef HAVE_VSNPRINTF
+#warning You have not compiled op with vsnprintf
+#warning support, presumably because your system
+#warning does not have it. This leaves op open
+#warning to potential buffer overflows.
+#endif
+
+#ifdef HAVE_SNPRINTF
+#error "Now using 'vsnprintf' instead of snprintf. Adjust your build to define HAVE_VSNPRINTF."
+#endif
+
+void strnprintf(char *out, int len, const char *format, va_list args) {
+
+#ifdef HAVE_VSNPRINTF
+	vsnprintf(out, len, format, args);
+#else
+	vsprintf(out, format, args);
+#endif
+}
+
+char *strtolower(char *in) {
+char *i;
+
+	for (i = in; *i; ++i) *i = tolower(*i);
+	return in;
+}
 
 array_t *array_alloc() {
 array_t *array = malloc(sizeof(array_t));

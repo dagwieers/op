@@ -106,22 +106,28 @@ int SortCommandList(const void *a, const void *b)
 
 void ListCommands()
 {
-cmd_t *cmd;
+cmd_t *def, *cmd;
 array_t *cmds = array_alloc();
 int length = 0, i;
 
+	def = Find("DEFAULT");
 	/*	first pass, get maximum command length and number of commands we have
 		permission to use */
 	for (cmd = First; cmd != NULL; cmd = cmd->next) {
-		if (strcmp(cmd->name, "DEFAULT") && VerifyPermissions(cmd) >= 0) {
-		int l = strlen(cmd->name);
 
-			for (i = 0; i < cmds->size; ++i)
-				if (!strcmp(((cmd_t*)cmds->data[i])->name, cmd->name))
-					break;
-			if (i == cmds->size) {
-				if (l > length) length = l;
-				array_push(cmds, cmd);
+		if (strcmp(cmd->name, "DEFAULT")) {
+		cmd_t *new = BuildSingle(def, cmd);
+
+			if (VerifyPermissions(new) >= 0) {
+			int l = strlen(new->name);
+
+				for (i = 0; i < cmds->size; ++i)
+					if (!strcmp(((cmd_t*)cmds->data[i])->name, new->name))
+						break;
+				if (i == cmds->size) {
+					if (l > length) length = l;
+					array_push(cmds, new);
+				}
 			}
 		}
 	}
@@ -132,20 +138,22 @@ int length = 0, i;
 	for (i = 0; i < cmds->size; ++i) {
 		cmd = cmds->data[i];
 
-		if (!strcmp(cmd->name, "DEFAULT")) continue;
+		if (strcmp(cmd->name, "DEFAULT")) {
+		cmd_t *new = BuildSingle(def, cmd);
 
-		if (VerifyPermissions(cmd) >= 0) {
-		char *help = FindOpt(cmd, "help");
+			if (VerifyPermissions(new) >= 0) {
+			char *help = FindOpt(new, "help");
 
-			if (!help || !*help) help = "(no help available)";
-			printf("%-*s", length + 2, cmd->name);
-			while (*help) {
-			int j;
+				if (!help || !*help) help = "(no help available)";
+				printf("%-*s", length + 2, new->name);
+				while (*help) {
+				int j;
 
-				printf("%-*.*s\n", 77 - length, 77 - length, help);
-				for (j = 0; j < 77 - length && *help; ++j, ++help) ;
-				if (j == 77 - length)
-					printf("%-*s", length + 2, "");
+					printf("%-*.*s\n", 77 - length, 77 - length, help);
+					for (j = 0; j < 77 - length && *help; ++j, ++help) ;
+					if (j == 77 - length)
+						printf("%-*s", length + 2, "");
+				}
 			}
 		}
 	}
@@ -173,11 +181,7 @@ DIR *d;
 		qsort(dir_list->data, dir_list->size, sizeof(void*), FileCompare);
 		for (i = 0; i < dir_list->size; ++i) {
 		char full_path[PATH_MAX];
-#ifdef HAVE_SNPRINTF
 			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
-#else
-			sprintf(full_path, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
-#endif
 			if (ReadFile(full_path)) successes++;
 		}
 		return successes;
@@ -187,7 +191,7 @@ DIR *d;
 
 int main(argc, argv)
 int	argc;
-char	**argv;
+char	*argv[];
 {
 	int		num, argStart = 1;
 	char		user[MAXSTRLEN];
@@ -298,6 +302,7 @@ char	**argv;
 	argv += argStart;
 
 	new = Build(def, cmd);
+
 	num = CountArgs(new);
 
 	if ((num < 0) && ((argc-1) < -num))
@@ -320,7 +325,7 @@ char	*name;
 	cmd_t	*cmd;
 
 	for (cmd = First; cmd != NULL; cmd = cmd ->next) {
-		if (strcmp(cmd->name, name) == 0 && VerifyPermissions(cmd) >= 0)
+		if (strcmp(cmd->name, name) == 0)
 			break;
 	}
 
@@ -448,10 +453,6 @@ int		i;
 char		*cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
 regexp		*reg1 = NULL;
 struct passwd	*pw;
-#ifdef USE_PAM
-struct pam_conv pamconv = { pam_conversation, NULL };
-pam_handle_t *pam;
-#endif
 struct group	*gr;
 
 	/* root always has access - it is pointless refusing */
@@ -701,6 +702,9 @@ char            input[64],*p;
 
 		strncpy(str, cmd->opts[i] + 1, cp - cmd->opts[i] - 1);
 		str[cp - cmd->opts[i] - 1] = '\0';
+
+		if (!isdigit(*str)) continue;
+
 		val = atoi(str);
 
 		if (val >= argc) continue;
@@ -865,11 +869,15 @@ char	**argv;
 			new_envp[curenv] = malloc(strlen("XAUTHORITY=") + strlen(xauth) + 1);
 			strcpy(new_envp[curenv], "XAUTHORITY=");
 			strcat(new_envp[curenv], xauth);
+			if (curenv + 1 >= MAXENV)
+				fatal(1, "Environment length exceeded");
 			++curenv;
 			/* Propagate $DISPLAY to new environment */
 			new_envp[curenv] = malloc(strlen("DISPLAY=") + strlen(getenv("DISPLAY")) + 1);
 			strcpy(new_envp[curenv], "DISPLAY=");
 			strcat(new_envp[curenv], getenv("DISPLAY"));
+			if (curenv + 1 >= MAXENV)
+				fatal(1, "Environment length exceeded");
 			++curenv;
 		}
 	}
@@ -945,6 +953,7 @@ char	**argv;
 		for (i = 0; i < cmd->nopts; i++) {
 			if (cmd->opts[i][0] != '$')
 				continue;
+			/* Skip positional constraints */
 			cp = cmd->opts[i] + 1;
 			flag = 0;
 			while ((*cp != '\0') && (*cp != '=')) {
@@ -952,25 +961,45 @@ char	**argv;
 					flag = 1;
 				cp++;
 			}
-			if (! flag)
+			if (!flag)
 				continue;
-			if (strchr(cmd->opts[i], '=') != NULL) {
-				new_envp[curenv++] = cmd->opts[i] + 1;
-				continue;
-			}
+			/* Propagate variable into environment if it exists */
 			for (j = 0; environ[j] != NULL ; j++) {
 				if ((cp = strchr(environ[j], '=')) == NULL)
 					continue;
-				if (strncmp(cmd->opts[i] + 1, environ[j],
-						cp - environ[j]) == 0) {
+				if (strncmp(cmd->opts[i] + 1, environ[j], cp - environ[j]) == 0) {
+					if (curenv + 1 >= MAXENV)
+						fatal(1, "Environment length exceeded");
 					new_envp[curenv++] = environ[j];
 					break;
 				}
 			}
 		}
 	} else {
-		for (i = 0; environ[i] != NULL; i++)
+		for (i = 0; environ[i] != NULL; i++) {
+			if (curenv + 1 >= MAXENV)
+				fatal(1, "Environment length exceeded");
 			new_envp[curenv++] = environ[i];
+		}
+	}
+	/* Allow over-ride of environment variables. */
+	for (i = 0; i < cmd->nopts; ++i) {
+		/* Skip positional constraints */
+		cp = cmd->opts[i] + 1;
+		flag = 0;
+		while ((*cp != '\0') && (*cp != '=')) {
+			if (! isdigit(*cp))
+				flag = 1;
+			cp++;
+		}
+		if (!flag)
+			continue;
+		if (cmd->opts[i][0] == '$' && strchr(cmd->opts[i], '=') != NULL) {
+			if (curenv + 1 >= MAXENV)
+				fatal(1, "Environment length exceeded");
+			new_envp[curenv++] = cmd->opts[i] + 1;
+			continue;
+		}
 	}
 	new_envp[curenv] = NULL;
 
@@ -979,13 +1008,17 @@ char	**argv;
 			if (strncmp("SHELL=", environ[i], 6) == 0)
 				break;
 
-		if (environ[i] != NULL)
+		if (environ[i] != NULL) {
+			if (curarg >= MAXARG - 1)
+				fatal(1, "Argument length exceeded");
 			new_argv[curarg++] = environ[i] + 6;
-		else {
+		} else {
 			fatal(1, "No shell");
 		}
 
 		if (argc != 1) {
+			if (curarg >= MAXARG - 1)
+				fatal(1, "Argument length exceeded");
 			new_argv[curarg++] = "-c";
 
 			for (i = 1; i < argc; i++)
@@ -1001,63 +1034,85 @@ char	**argv;
 				strcat(cp, argv[i]);
 				strcat(cp, " ");
 			}
+			if (curarg >= MAXARG - 1)
+				fatal(1, "Argument length exceeded");
 			new_argv[curarg++] = cp;
 		}
 	} else {
 		for (i = 0; i < cmd->nargs; i++) {
 			np = cmd->args[i];
 
-			/* Embedded match */
-			while ((cp = strchr(np, '$')) != NULL) {
-				if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
-					np = cp + 1;
-				else {
-				char *tmp;
+			/* Complete argument is a variable expansion. */
+			if (strlen(np) == 2 && np[0] == '$') {
+				if (np[1] == '*') {
+					if (curarg + argc >= MAXARG - 1)
+						fatal(1, "Argument length exceeded");
+					for (j = 1; j < argc; j++)
+						new_argv[curarg++] = argv[j];
+				} else
+				if (isdigit(np[1])) {
+					if (atoi(np + 1) > argc)
+						fatal(1, "Referenced argument out of range");
+					if (curarg >= MAXARG - 1)
+						fatal(1, "Argument length exceeded");
+					new_argv[curarg++] = argv[atoi(np + 1)];
+				}
+				continue;
+			} else {
+				/* Embedded match */
+				while ((cp = strchr(np, '$')) != NULL) {
+					if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
+						np = cp + 1;
+					else {
+					char *tmp;
 
-					np = cp + 1;
-					++cp;
-
-					if (*cp == '*') {
-					int len = 1;
-					char *buffer;
-
+						np = cp + 1;
 						++cp;
-						/* Find total length of all arguments */
-						for (j = 1; j < argc; j++)
-							len += strlen(argv[j]) + 1;
 
-						if ((buffer = malloc(len)) == NULL)
-							fatal(1, "Can't allocate buffer");
+						if (*cp == '*') {
+						int len = 1;
+						char *buffer;
 
-						buffer[0] = 0;
+							++cp;
+							/* Find total length of all arguments */
+							for (j = 1; j < argc; j++)
+								len += strlen(argv[j]) + 1;
 
-						/* Expand all arguments */
-						for (j = 1; j < argc; j++) {
-							strcat(buffer, argv[j]);
-							if (j < argc - 1) strcat(buffer, " ");
-						}
-						tmp = str_replace(cmd->args[i],
-							np - cmd->args[i] - 1, cp - np + 1, buffer);
-						cp = tmp + (cp - cmd->args[i]);
-						np = cp;
-						cmd->args[i] = tmp;
-					} else {
-						while (isdigit(*cp)) ++cp;
+							if ((buffer = malloc(len)) == NULL)
+								fatal(1, "Can't allocate buffer");
 
-						if (cp != np) {
-							val = atoi(np);
+							buffer[0] = 0;
 
+							/* Expand all arguments */
+							for (j = 1; j < argc; j++) {
+								strcat(buffer, argv[j]);
+								if (j < argc - 1) strcat(buffer, " ");
+							}
 							tmp = str_replace(cmd->args[i],
-								np - cmd->args[i] - 1, cp - np + 1, argv[val]);
-							cp = tmp + (cp - cmd->args[i]) + 1;
+								np - cmd->args[i] - 1, cp - np + 1, buffer);
+							cp = tmp + (cp - cmd->args[i]);
 							np = cp;
 							cmd->args[i] = tmp;
+						} else {
+							while (isdigit(*cp)) ++cp;
+
+							if (cp != np) {
+								val = atoi(np);
+
+								tmp = str_replace(cmd->args[i],
+									np - cmd->args[i] - 1, cp - np + 1, argv[val]);
+								cp = tmp + (cp - cmd->args[i]) + 1;
+								np = cp;
+								cmd->args[i] = tmp;
+							}
 						}
 					}
 				}
 			}
 
 			if (cp == NULL) {
+				if (curarg >= MAXARG - 1)
+					fatal(1, "Argument length exceeded");
 				new_argv[curarg++] = cmd->args[i];
 				continue;
 			}
@@ -1133,12 +1188,6 @@ char *buf =0;
 	return(retbuf);
 }
 
-#ifndef HAVE_SNPRINTF
-#warning You have not compiled op with snprintf support, presumably because
-#warning your system does not have it. This leaves op potentially open to
-#warning buffer overflows.
-#endif
-
 unsigned minimum_logging_level = 99;
 
 int vlogger(unsigned level, const char *format, va_list args) {
@@ -1149,22 +1198,12 @@ char *username = "unknown";
 
 	if (realuser) username = realuser->pw_name;
 
-#ifdef HAVE_SNPRINTF
-	vsnprintf(buffer2, MAXSTRLEN, format, args);
-#else
-	vsprintf(buffer2, format, args);
-#endif
+	strnprintf(buffer2, MAXSTRLEN, format, args);
 	if (level & LOG_PRINT) printf("%s\n", buffer2);
 	level &= ~LOG_PRINT;
-#ifdef HAVE_SNPRINTF
 	snprintf(buffer, MAXSTRLEN, "%s =>%s: %s", username, 
 		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
 		buffer2);
-#else
-	sprintf(buffer, "%s =>%s: %s", username, 
-		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
-		buffer2);
-#endif
 	syslog(level, "%s", buffer);
 	return -1;
 }
@@ -1183,11 +1222,7 @@ char buffer[MAXSTRLEN];
 va_list	ap;
 
 	va_start(ap, format);
-#ifdef HAVE_SNPRINTF
-	vsnprintf(buffer, MAXSTRLEN, format, ap);
-#else
-	vsprintf(buffer, format, ap);
-#endif
+	strnprintf(buffer, MAXSTRLEN, format, ap);
 	fprintf(stderr, "%s\n", buffer);
 	if (logit) logger(LOG_ERR, "%s", buffer);
 	va_end(ap);
