@@ -10,11 +10,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <errno.h>
-#include <sys/time.h>
 #include <netdb.h>
-#include <time.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -23,8 +20,6 @@
 #include <grp.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <string.h>
-#include <dirent.h>
 #include "defs.h"
 #include "regexp.h"
 
@@ -64,9 +59,6 @@ union config_record configure;
 #define	MAXARG	1024
 #define	MAXENV	MAXARG
 
-#ifndef _AIX
-extern char	*strchr();
-#endif
 extern char	*savestr();
 extern char	*getpass(), *crypt();
 
@@ -81,10 +73,11 @@ void	ListCommands();
 int Go(cmd_t *cmd, int num, int argc, char **argv);
 cmd_t	*First = NULL;
 var_t	*Variables = NULL;
-struct passwd *realuser = NULL;
+char *realuser = NULL;
 int gargc = -1;
 char **gargv = NULL;
 sigset_t sig_mask, old_sig_mask;
+unsigned minimum_logging_level = 99;
 
 void Usage()
 {
@@ -181,7 +174,7 @@ DIR *d;
 		qsort(dir_list->data, dir_list->size, sizeof(void*), FileCompare);
 		for (i = 0; i < dir_list->size; ++i) {
 		char full_path[PATH_MAX];
-			snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
+			strnprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR, (char*)dir_list->data[i]);
 			if (ReadFile(full_path)) successes++;
 		}
 		return successes;
@@ -208,11 +201,10 @@ char	*argv[];
 	sigaddset(&sig_mask, SIGTERM);
 
 	if (sigprocmask(SIG_BLOCK, &sig_mask, &old_sig_mask))
-		fatal(1, "Could not set signal mask");
+		fatal(1, "could not set signal mask");
 
 	gargv = argv;
 	gargc = argc;
-	realuser = getpwuid(getuid());
 
 	while (1) {
 		if (argStart >= argc)
@@ -268,11 +260,11 @@ char	*argv[];
 	read_conf_dir = ReadDir( OP_ACCESS_DIR );
 
 	if (!read_conf && !read_conf_dir)
-		fatal(1, "Could not open %s or any configuration files in %s", OP_ACCESS, OP_ACCESS_DIR);
+		fatal(1, "could not open %s or any configuration files in %s", OP_ACCESS, OP_ACCESS_DIR);
 
 	if ((pw = getpwuid(getuid())) == NULL) 
 		exit(1);
-	realuser = getpwuid(getuid());
+	realuser = (char*)strdup(pw->pw_name);
 	strncpy(user, pw->pw_name, MAXSTRLEN);
 
 	if (lflag) {
@@ -283,7 +275,7 @@ char	*argv[];
 	if (hflag) {
 		if (uptr != NULL) {
 			if (getuid() != 0) 
-				fatal(1, "Permission denied for -u option");
+				fatal(1, "permission denied for -u option");
 		}
 	}
 	if (uptr != NULL) 
@@ -293,10 +285,21 @@ char	*argv[];
 		Usage();
 
 	def = Find("DEFAULT");
-	cmd = Find(argv[argStart]);
+
+	/* Reduce fully qualifed path to basename and see if that is a command */
+	uptr=strrchr(argv[argStart],'/');
+	if (uptr == NULL)
+		uptr=argv[argStart];
+	else {
+		uptr++;
+		if (access(argv[argStart], F_OK) != 0)
+			if (access(argv[argStart], X_OK) != 0)
+				fatal(1, "unknown or non executable command");
+	}
+	cmd = Find(uptr);
 
 	if (cmd == NULL) 
-		fatal(1, "No such command %s", argv[1]);
+		fatal(1, "no such command %s", argv[1]);
 
 	argc -= argStart;
 	argv += argStart;
@@ -306,15 +309,15 @@ char	*argv[];
 	num = CountArgs(new);
 
 	if ((num < 0) && ((argc-1) < -num))
-		fatal(1, "Improper number of arguments");
+		fatal(1, "%s: improper number of arguments", cmd->name);
 	if ((num > 0) && ((argc-1) != num)) 
-		fatal(1, "Improper number of arguments");
+		fatal(1, "%s: improper number of arguments", cmd->name);
 	if (num <0)
 		num = -num;
 
 	pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN);
 	if (Verify(new, num, argc, argv) < 0)
-		fatal(0, "Permission denied by op");
+		fatal(0, "%s: permission denied by op", cmd->name);
 
 	return Go(new, num, argc, argv);
 }
@@ -622,7 +625,7 @@ char            input[64],*p;
 	if ((cp=FindOpt(cmd, "securid")) != NULL) {
 		return logger(LOG_ERR | LOG_PRINT, "SecureID not supported by op. Access denied");
 	}
-#endif	
+#endif
 
 	if (getuid() != 0 && (cp=FindOpt(cmd, "password")) != NULL) {
 #ifdef USE_PAM
@@ -692,7 +695,7 @@ char            input[64],*p;
 					if ((reg1=regcomp(regstr)) == NULL) return logger(LOG_ERR, "Invalid regex '%s'", regstr);
 					if (regexec(reg1,argv[j]) == 1) break;
 				}
-				if (cp == NULL) return logger(LOG_ERR, "Argument %i (%s) did not pass wildcard constraint", j, argv[j]);
+				if (cp == NULL) return logger(LOG_ERR, "%s: argument %i (%s) did not pass wildcard constraint", cmd->name, j, argv[j]);
 			}
 		}
 		if(reg1 != NULL){
@@ -740,7 +743,7 @@ char            input[64],*p;
 				reg2 = NULL;
 			}
 		}
-		if (cp == NULL) return logger(LOG_ERR, "Argument '%s' did not pass constraint '%s'", argv[val], np);
+		if (cp == NULL) return logger(LOG_ERR, "%s: argument '%s' did not pass constraint '%s'", cmd->name, argv[val], np);
 	}
 	return 0;
 }
@@ -825,7 +828,6 @@ char	**argv;
 				/*	We need to be root to be sure that access to both Xauthority files
 					will work */
 				umask(077); setuid(currentpw->pw_uid); setgid(currentpw->pw_gid);
-				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s %s' as %i", argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], currentpw->pw_uid);
 				if (execv(XAUTH, argv) == -1) {
 					logger(LOG_ERR, "Unable to exec xauth, return code %i", errno);
 					exit(errno);
@@ -844,7 +846,6 @@ char	**argv;
 			if (fork() == 0) {
 			char *argv[] = { XAUTH, "-f", xauth, "merge", tmpxauth, NULL };
 
-				//logger(LOG_DEBUG, "Executing '%s %s %s %s %s' as %i", argv[0], argv[1], argv[2], argv[3], argv[4], uid);
 				/*	We need to be root to be sure that access to both Xauthority files
 					will work */
 				if (chown(tmpxauth, uid, gid) < 0) {
@@ -870,14 +871,14 @@ char	**argv;
 			strcpy(new_envp[curenv], "XAUTHORITY=");
 			strcat(new_envp[curenv], xauth);
 			if (curenv + 1 >= MAXENV)
-				fatal(1, "Environment length exceeded");
+				fatal(1, "%s: environment length exceeded",cmd->name);
 			++curenv;
 			/* Propagate $DISPLAY to new environment */
 			new_envp[curenv] = malloc(strlen("DISPLAY=") + strlen(getenv("DISPLAY")) + 1);
 			strcpy(new_envp[curenv], "DISPLAY=");
 			strcat(new_envp[curenv], getenv("DISPLAY"));
 			if (curenv + 1 >= MAXENV)
-				fatal(1, "Environment length exceeded");
+				fatal(1, "%s: environment length exceeded",cmd->name);
 			++curenv;
 		}
 	}
@@ -969,7 +970,7 @@ char	**argv;
 					continue;
 				if (strncmp(cmd->opts[i] + 1, environ[j], cp - environ[j]) == 0) {
 					if (curenv + 1 >= MAXENV)
-						fatal(1, "Environment length exceeded");
+						fatal(1, "%s: environment length exceeded",cmd->name);
 					new_envp[curenv++] = environ[j];
 					break;
 				}
@@ -978,7 +979,7 @@ char	**argv;
 	} else {
 		for (i = 0; environ[i] != NULL; i++) {
 			if (curenv + 1 >= MAXENV)
-				fatal(1, "Environment length exceeded");
+				fatal(1, "%s: environment length exceeded",cmd->name);
 			new_envp[curenv++] = environ[i];
 		}
 	}
@@ -996,12 +997,99 @@ char	**argv;
 			continue;
 		if (cmd->opts[i][0] == '$' && strchr(cmd->opts[i], '=') != NULL) {
 			if (curenv + 1 >= MAXENV)
-				fatal(1, "Environment length exceeded");
+				fatal(1, "%s: environment length exceeded",cmd->name);
 			new_envp[curenv++] = cmd->opts[i] + 1;
 			continue;
 		}
 	}
 	new_envp[curenv] = NULL;
+
+	/* --------------------------------------------------- */
+	/* fowners constraint must respect the syntax :        */
+	/* fowners=user:group,...                              */
+	/* Notice : user and/or group are regular expressions  */
+	/* --------------------------------------------------- */
+
+	if ((cp = FindOpt(cmd, "fowners")) != NULL) {
+		struct passwd * pwbuf;
+		struct group * grbuf;
+		struct stat statbuf;
+		char * ptr;
+		char usergroup[MAXSTRLEN];
+
+		/* Get user and group name of the owner of the file */
+		stat(cmd->args[0],&statbuf);
+
+		pwbuf = getpwuid(statbuf.st_uid);
+		if (pwbuf == NULL)
+			fatal(1,"%s: no identified user for uid %d", cmd->name, statbuf.st_uid);
+		grbuf = getgrgid(statbuf.st_gid);
+		if (grbuf == NULL)
+			fatal(1,"%s: no identified group for gid %d", cmd->name, statbuf.st_gid);
+
+		if (strlen(pwbuf->pw_name) + strlen(grbuf->gr_name) + 1 >= MAXSTRLEN)
+			fatal(1, "%s: user/group string buffer length exceeded", cmd->name);
+		strcpy(usergroup, pwbuf->pw_name);
+		strcat(usergroup, ":");
+		strcat(usergroup, grbuf->gr_name);
+
+		/* check users,groups candidates */
+		
+		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL; cp = GetField(cp, str, MAXSTRLEN - 5)) {
+			regexp		*reg1 = NULL;
+			char regstr[MAXSTRLEN];
+
+			ptr=strchr(str,':');
+			if (ptr == NULL)
+				fatal(1,"%s: fowners argument must respect the user:group format", cmd->name);
+
+			strcpy(regstr, "^(");
+			strcat(regstr, str);
+			strcat(regstr, ")$");
+		
+			if ((reg1 = regcomp(regstr)) == NULL)
+				return logger(LOG_ERR, "Invalid regex '%s'", str);
+	
+			if ((regexec(reg1, usergroup) == 1))
+				break;
+		}
+		if (cp == NULL)
+			fatal(1,"%s: file %s (%s) did not pass ownership constraints",
+			  cmd->name, cmd->args[0], usergroup);
+	}
+
+	/* ---------------------------------------------------------------------- */
+	/* fperms constraint must respect the syntax :                            */
+	/* fperms=NNNN,MMMM,... where NNNN and MMMM are octal representation of   */
+	/*                            the target requested authorised permissions */
+	/* Notice : NNNN and MMMM can be regular expressions                      */
+	/* ---------------------------------------------------------------------- */
+
+	if ((cp = FindOpt(cmd, "fperms")) != NULL) {
+		struct stat buf;
+		char   mode[5];
+
+		stat(cmd->args[0],&buf);
+		strnprintf(mode, 5, "%o", buf.st_mode & 07777);
+
+		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL; cp = GetField(cp, str, MAXSTRLEN - 5)) {
+			regexp		*reg1 = NULL;
+			char regstr[MAXSTRLEN];
+
+			strcpy(regstr, "^(");
+			strcat(regstr, str);
+			strcat(regstr, ")$");
+		
+			if ((reg1 = regcomp(regstr)) == NULL)
+				return logger(LOG_ERR, "Invalid regex '%s'", str);
+
+			if (regexec(reg1,mode) == 1)
+				break;
+		}
+		if (cp == NULL)
+			fatal(1,"%s: file %s (%s) did not pass permissions constraints",
+			  cmd->name, cmd->args[0],mode);
+	}
 
 	if (strcmp("MAGIC_SHELL", cmd->args[0]) == 0) {
 		for (i = 0; environ[i] != NULL; i++) 
@@ -1010,22 +1098,22 @@ char	**argv;
 
 		if (environ[i] != NULL) {
 			if (curarg >= MAXARG - 1)
-				fatal(1, "Argument length exceeded");
+				fatal(1, "%s: argument length exceeded",cmd->name);
 			new_argv[curarg++] = environ[i] + 6;
 		} else {
-			fatal(1, "No shell");
+			fatal(1, "%s: no shell", cmd->name);
 		}
 
 		if (argc != 1) {
 			if (curarg >= MAXARG - 1)
-				fatal(1, "Argument length exceeded");
+				fatal(1, "%s: argument length exceeded",cmd->name);
 			new_argv[curarg++] = "-c";
 
 			for (i = 1; i < argc; i++)
 				len += strlen(argv[i]) + 1;
 
 			if ((cp = (char *)malloc(len + 10)) == NULL)
-				fatal(1, "Unable to create buffer");
+				fatal(1, "%s: unable to create buffer", cmd->name);
 
 			len = 0;
 			*cp = '\0';
@@ -1035,10 +1123,12 @@ char	**argv;
 				strcat(cp, " ");
 			}
 			if (curarg >= MAXARG - 1)
-				fatal(1, "Argument length exceeded");
+				fatal(1, "%s: argument length exceeded",cmd->name);
 			new_argv[curarg++] = cp;
 		}
 	} else {
+	int consumed_args = 1;
+
 		for (i = 0; i < cmd->nargs; i++) {
 			np = cmd->args[i];
 
@@ -1046,16 +1136,20 @@ char	**argv;
 			if (strlen(np) == 2 && np[0] == '$') {
 				if (np[1] == '*') {
 					if (curarg + argc >= MAXARG - 1)
-						fatal(1, "Argument length exceeded");
-					for (j = 1; j < argc; j++)
+						fatal(1, "%s: argument length exceeded",cmd->name);
+					for (j = consumed_args; j < argc; j++)
 						new_argv[curarg++] = argv[j];
 				} else
 				if (isdigit(np[1])) {
-					if (atoi(np + 1) > argc)
-						fatal(1, "Referenced argument out of range");
+				int argi = atoi(np + 1);
+
+					if (argi > argc)
+						fatal(1, "%s Referenced argument out of range",cmd->name);
 					if (curarg >= MAXARG - 1)
-						fatal(1, "Argument length exceeded");
-					new_argv[curarg++] = argv[atoi(np + 1)];
+						fatal(1, "%s: argument length exceeded",cmd->name);
+					new_argv[curarg++] = argv[argi];
+					if (argi >= consumed_args)
+						consumed_args = argi + 1;
 				}
 				continue;
 			} else {
@@ -1112,7 +1206,7 @@ char	**argv;
 
 			if (cp == NULL) {
 				if (curarg >= MAXARG - 1)
-					fatal(1, "Argument length exceeded");
+					fatal(1, "%s: argument length exceeded",cmd->name);
 				new_argv[curarg++] = cmd->args[i];
 				continue;
 			}
@@ -1124,7 +1218,7 @@ char	**argv;
 		logger(LOG_INFO, "SUCCESS");
 
 	if (sigprocmask(SIG_SETMASK, &old_sig_mask, NULL))
-		fatal(1, "Could not restore signal mask");
+		fatal(1, "could not restore signal mask");
 	if ((i = execve(new_argv[0], new_argv, new_envp)) < 0) {
 		perror("execve");
 		logger(LOG_ERR, "execve(3) failed with error code %i", i);
@@ -1188,20 +1282,18 @@ char *buf =0;
 	return(retbuf);
 }
 
-unsigned minimum_logging_level = 99;
-
 int vlogger(unsigned level, const char *format, va_list args) {
 char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
 char *username = "unknown";
 
 	if (level >= minimum_logging_level) return -1;
 
-	if (realuser) username = realuser->pw_name;
+	if (realuser) username = realuser;
 
-	strnprintf(buffer2, MAXSTRLEN, format, args);
+	vstrnprintf(buffer2, MAXSTRLEN, format, args);
 	if (level & LOG_PRINT) printf("%s\n", buffer2);
 	level &= ~LOG_PRINT;
-	snprintf(buffer, MAXSTRLEN, "%s =>%s: %s", username, 
+	strnprintf(buffer, MAXSTRLEN, "%s%s: %s", username, 
 		format_cmd(gargc, gargv, buffer3, MAXSTRLEN),
 		buffer2);
 	syslog(level, "%s", buffer);
@@ -1222,7 +1314,7 @@ char buffer[MAXSTRLEN];
 va_list	ap;
 
 	va_start(ap, format);
-	strnprintf(buffer, MAXSTRLEN, format, ap);
+	vstrnprintf(buffer, MAXSTRLEN, format, ap);
 	fprintf(stderr, "%s\n", buffer);
 	if (logit) logger(LOG_ERR, "%s", buffer);
 	va_end(ap);

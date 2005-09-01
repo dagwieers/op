@@ -29,5 +29,5 @@ void regsub(regexp *prog, char *source, char *dest);
  */
 #define	MAGIC	0234
 
-#endif // REGEXP_DWA20011023_H
+#endif
 

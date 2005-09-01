@@ -1,3 +1,10 @@
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+This document is largely out of date, but left for historical interest.
+
+Alec Thomas, 08/06/2005
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 Op is a tool for allowing users to run root privileged commands
 without the root password. It is described in detail in "Op: A Flexible

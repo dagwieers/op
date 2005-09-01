@@ -1356,7 +1356,6 @@ char *dest;
 	register char c;
 	register int no;
 	register int len;
-	extern char *strncpy();
 
 	if (prog == NULL || source == NULL || dest == NULL) {
 		regerror("NULL parm to regsub");
