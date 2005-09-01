@@ -24,9 +24,6 @@ void preprocerror(const char *str);
 static void addquotedarg(int state, cmd_t *cmd, const char *instr);
 static void addarg(int state, cmd_t *cmd, const char *instr);
 
-#ifndef _AIX
-extern char	*strchr();
-#endif
 int	yyline = 1;
 
 %}
@@ -35,10 +32,12 @@ WS		[ \t]*
 NWS		[^ \n\t;]+
 
 %s ARGS
+%a 2700
+%o 3700
 
 %%
 	int	state = 0;
-	cmd_t	*cmd;
+	cmd_t	*cmd = NULL;
 
 #[^\n]*			;
 ^%(((if|elsif)[ \t]+.*)|(else|endif))		{ preproc(yytext); }
@@ -392,9 +391,6 @@ cmd_t	*BuildSingle(cmd_t *def, cmd_t *cmd)
 	cmd_t	*new = alloccmd(cmd->name ? cmd->name : "");
 	char	defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
 	int		i, j;
-#ifndef _AIX
-	extern char	*strchr();
-#endif
 	if (cmd == NULL)
 		return def;
 	if (def == NULL)

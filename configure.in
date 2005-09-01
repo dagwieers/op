@@ -1,0 +1,84 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ(2.59)
+AC_INIT(op, 1.31, alec@swapoff.org)
+AC_CONFIG_SRCDIR([regexp.h])
+AC_CONFIG_HEADER([config.h])
+AM_INIT_AUTOMAKE
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_LEX
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+
+AC_CHECK_FUNC([crypt], [], [AC_CHECK_LIB([crypt], [crypt], [], [AC_MSG_ERROR(Can't find crypt())])])
+
+# Feature checks
+auto_detect_auth=no
+with_pam=${with_pam:-yes}
+AC_ARG_WITH(pam, [  --with-pam              use PAM for authentication (yes)])
+if test "${with_pam}" = yes; then
+	AC_CHECK_LIB([pam], [pam_start], [
+		AC_DEFINE(USE_PAM, [], [Use PAM for authentication])
+		LIBS="$LIBS -lpam"
+		], [
+		AC_MSG_WARN([Can't find pam_start() in libpam, trying shadow support])
+		auto_detect_auth=yes
+		with_pam=no
+		# Try shadow if PAM failed
+		with_shadow=yes
+		])
+fi
+
+with_shadow=${with_shadow:-no}
+AC_ARG_WITH(shadow, [  --with-shadow           use shadow file for authentication
+                          (default if PAM not found)])
+if test "${with_shadow}" = yes; then
+	if test "${with_pam}" = yes; then
+		AC_MSG_WARN([Can't enable PAM and shadow support, shadow disabled])
+	else
+		if test "${auto_detect_auth}" = yes -a ! -e /etc/shadow; then
+			AC_MSG_WARN([Failed to find shadow support while auto-detecting authentication mechanisms, using basic crypt])
+		else
+			if test ! -e /etc/shadow; then
+				AC_MSG_WARN([Shadow support enabled but /etc/shadow does not exist, continuing anyway])
+			fi
+			AC_DEFINE(USE_SHADOW, [], [Use shadow file for authentication])
+		fi
+	fi
+fi
+
+enable_xauth=${enable_xauth:-no}
+AC_ARG_ENABLE(xauth, [  --enable-xauth=<xauth>  enable xauth support and specify xauth binary])
+if test "${enable_xauth}" != no; then
+	CPPFLAGS="$CPPFLAGS -DXAUTH=\\\"$enable_xauth\\\""
+fi
+
+AC_CHECK_LIB([fl], [yywrap])
+
+# Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_HEADER_TIME
+AC_CHECK_HEADERS([limits.h netdb.h shadow.h stdlib.h string.h sys/time.h syslog.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_UID_T
+
+# Checks for library functions.
+AC_FUNC_CHOWN
+AC_FUNC_CLOSEDIR_VOID
+AC_FUNC_FORK
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_FUNC_STAT
+AC_FUNC_STRFTIME
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS([gethostname getpass getspnam memset regcomp strchr strcspn vsnprintf])
+
+AC_CONFIG_FILES([Makefile op.list])
+AC_OUTPUT

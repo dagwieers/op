@@ -183,6 +183,17 @@ Disables informational logging per command. Useful for cron jobs to avoid
 spamming the logs. Note that authentication failures and other errors will
 still be logged.
 .TP
+.B fowners
+Specifies the owner and group of the target command executable as a list of
+regular expression in the form
+.I user:group
+If the executables ownership does not match, the command will not be executed.
+.TP
+.B fperms
+As with
+.I fowners
+but matches against the octal permissions of the executable.
+.TP
 .B xauth
 Attempt to propagate the X authority entry for the current display to the new
 users X authority file. The DISPLAY environment variable is also propagated to
@@ -376,4 +387,4 @@ Further changes by
 alec@swapoff.org
 .SH COPYRIGHTS
 \fB\(co\fR\s12 Copyright 1991 by David Koblas
-\fB\(co\fR\s12 Copyright 2002 by Alec Thomas
+\fB\(co\fR\s12 Copyright 2002-2005 by Alec Thomas

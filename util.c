@@ -4,24 +4,29 @@
 #include <stdlib.h>
 #include "defs.h"
 
-#ifndef HAVE_VSNPRINTF
-#warning You have not compiled op with vsnprintf
-#warning support, presumably because your system
-#warning does not have it. This leaves op open
-#warning to potential buffer overflows.
+#if !defined(HAVE_VSNPRINTF)
+#warning Your system does not support vsnprintf.
+#warning This leaves op open to potential buffer overflows.
 #endif
 
-#ifdef HAVE_SNPRINTF
-#error "Now using 'vsnprintf' instead of snprintf. Adjust your build to define HAVE_VSNPRINTF."
-#endif
-
-void strnprintf(char *out, int len, const char *format, va_list args) {
-
+void vstrnprintf(char *out, int len, const char *format, va_list args) {
 #ifdef HAVE_VSNPRINTF
 	vsnprintf(out, len, format, args);
 #else
 	vsprintf(out, format, args);
 #endif
+}
+
+void strnprintf(char *out, int len, const char *format, ...) {
+va_list args;
+
+	va_start(args, format);
+#ifdef HAVE_VSNPRINTF
+	vsnprintf(out, len, format, args);
+#else
+	vsprintf(out, format, args);
+#endif
+	va_end(args);
 }
 
 char *strtolower(char *in) {

@@ -10,6 +10,60 @@
 
 #include <unistd.h>
 #include <limits.h>
+#include "config.h"
+
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
+
+#if HAVE_DIRENT_H
+# include <dirent.h>
+# define NAMLEN(dirent) strlen((dirent)->d_name)
+#else
+# define dirent direct
+# define NAMLEN(dirent) (dirent)->d_namlen
+# if HAVE_SYS_NDIR_H
+#  include <sys/ndir.h>
+# endif
+# if HAVE_SYS_DIR_H
+#  include <sys/dir.h>
+# endif
+# if HAVE_NDIR_H
+#  include <ndir.h>
+# endif
+#endif
+
+#include <sys/types.h>
+#if HAVE_SYS_WAIT_H
+# include <sys/wait.h>
+#endif
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(stat_val) ((unsigned)(stat_val) >> 8)
+#endif
+#ifndef WIFEXITED
+# define WIFEXITED(stat_val) (((stat_val) & 255) == 0)
+#endif
+
+#if STDC_HEADERS
+# include <string.h>
+#else
+# if !HAVE_STRCHR
+#  define strchr index
+#  define strrchr rindex
+# endif
+char *strchr (), *strrchr ();
+# if !HAVE_MEMCPY
+#  define memcpy(d, s, n) bcopy ((s), (d), (n))
+#  define memmove(d, s, n) bcopy ((s), (d), (n))
+# endif
+#endif
 
 typedef struct cmd_s {
 	char		*name;
@@ -44,7 +98,8 @@ extern unsigned	minimum_logging_level;
 
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
-void strnprintf(char *out, int len, const char *format, va_list ap);
+void strnprintf(char *out, int len, const char *format, ...);
+void vstrnprintf(char *out, int len, const char *format, va_list ap);
 char *strtolower(char *in);
 
 int ReadFile(char *file);
@@ -53,9 +108,8 @@ int CountArgs(cmd_t *cmd);
 int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
-#define OP_ACCESS	"/etc/op.conf"
-#define OP_ACCESS_DIR	"/etc/op.d"
-#define VERSION     "1.30"
+#define OP_ACCESS	SYSCONFDIR "/op.conf"
+#define OP_ACCESS_DIR	SYSCONFDIR "/op.d"
 
 #define VAR_EXPAND_LEN	8192
 #define	VAR_NAME_LEN	64	
