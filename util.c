@@ -80,3 +80,8 @@ int array_extend(array_t *array, int capacity) {
 	array->data = realloc(array->data, sizeof(void**) * array->capacity);
 	return 1;
 }
+
+#undef malloc
+void * rpl_malloc (size_t n) { if (n == 0) n = 1; return malloc (n); }
+#undef realloc
+void * rpl_realloc (void *ptr, size_t n) { if (n == 0) n = 1; return realloc (ptr, n); }

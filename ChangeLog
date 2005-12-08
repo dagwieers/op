@@ -1,3 +1,12 @@
+08/12/05 - op 1.32
+==================
+
+  * Added rpl_malloc/rpl_realloc so that systems with dodgy implementations
+    will link. This fixes compilation on HPUX, for example.
+  * If a 'help' parameter does not exist, use the actual command to be run for
+    the help.
+  * Added detection for openlog() returning void.
+
 01/09/05 - op 1.31
 ==================
 

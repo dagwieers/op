@@ -137,16 +137,29 @@ int length = 0, i;
 			if (VerifyPermissions(new) >= 0) {
 			char *help = FindOpt(new, "help");
 
-				if (!help || !*help) help = "(no help available)";
-				printf("%-*s", length + 2, new->name);
-				while (*help) {
-				int j;
-
-					printf("%-*.*s\n", 77 - length, 77 - length, help);
-					for (j = 0; j < 77 - length && *help; ++j, ++help) ;
-					if (j == 77 - length)
-						printf("%-*s", length + 2, "");
+				if (!help || !*help) {
+				int j, len = 0;
+					
+					for (j = 0; j < cmd->nargs; ++j)
+						len += strlen(cmd->args[j]) + 1;
+					help = (char*)malloc(len);
+					strcpy(help, cmd->args[0]);
+					for (j = 1; j < cmd->nargs; ++j) {
+						strcat(help, " ");
+						if (strchr(cmd->args[j], ' ') || strchr(cmd->args[j], '\t')) {
+							strcat(help, "'");
+							strcat(help, cmd->args[j]);
+							strcat(help, "'");
+						} else
+							strcat(help, cmd->args[j]);
+					}
 				}
+				printf("%-*s", length + 2, new->name);
+				printf("%-*.*s", 77 - length, 77 - length, help);
+				if (strlen(help) > 77 - length)
+					printf("...\n");
+				else
+					printf("\n");
 			}
 		}
 	}
@@ -250,7 +263,7 @@ char	*argv[];
 		}
 	}
 
-#if defined (bsdi) || defined (SOLARIS) || defined (__linux__)
+#if OPENLOG_VOID
         openlog("op", LOG_PID | LOG_CONS, LOG_AUTH);
 #else
 	if (openlog("op", LOG_PID | LOG_CONS, LOG_AUTH) < 0) 
@@ -260,7 +273,7 @@ char	*argv[];
 	read_conf_dir = ReadDir( OP_ACCESS_DIR );
 
 	if (!read_conf && !read_conf_dir)
-		fatal(1, "could not open %s or any configuration files in %s", OP_ACCESS, OP_ACCESS_DIR);
+		fatal(1, "could not open %s or any configuration files in %s (check that file permissions are 600)", OP_ACCESS, OP_ACCESS_DIR);
 
 	if ((pw = getpwuid(getuid())) == NULL) 
 		exit(1);
