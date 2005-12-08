@@ -136,6 +136,9 @@
    slash. */
 #undef LSTAT_FOLLOWS_SLASHED_SYMLINK
 
+/* Does openlog() return void? */
+#undef OPENLOG_VOID
+
 /* Name of package */
 #undef PACKAGE
 

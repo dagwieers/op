@@ -4,7 +4,7 @@ man_MANS=op.1
 EXTRA_DIST=op.conf op.conf.complex op.list.in op.pam op.paper op.1
 #README
 
-AM_CPPFLAGS = -Wall -DSYSCONFDIR=\"$(sysconfdir)\"
+AM_CPPFLAGS = -Wall -DSYSCONFDIR=\"$(sysconfdir)\" @EXTRA_CPPFLAGS@
 
 install-exec-hook:
 	chmod 4755 $(DESTDIR)$(bindir)/op
