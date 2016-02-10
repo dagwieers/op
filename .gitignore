@@ -1,0 +1,9 @@
+.deps/
+Makefile
+config.h
+config.log
+config.status
+op.list
+stamp-h1
+*.o
+op
