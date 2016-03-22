@@ -1992,12 +1992,19 @@ char *yytext;
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
 #include <syslog.h>
 #include "defs.h"
+
+#if 0
+#define _msg(x) msg x
+#else
+#define _msg(x)
+#endif
 
 static cmd_t *newcmd();
 char *savestr();
@@ -2012,7 +2019,7 @@ int yyline = 1;
 #define YY_NO_INPUT
 
 
-#line 2016 "lex.c"
+#line 2023 "lex.c"
 
 #define INITIAL 0
 #define ARGS 1
@@ -2196,12 +2203,12 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 42 "lex.l"
+#line 49 "lex.l"
 
 	int	state = 0;
 	cmd_t	*cmd = NULL;
 
-#line 2205 "lex.c"
+#line 2212 "lex.c"
 
 	if ( !(yy_init) )
 		{
@@ -2287,75 +2294,75 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 46 "lex.l"
+#line 53 "lex.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 47 "lex.l"
+#line 54 "lex.l"
 { preproc(yytext); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 48 "lex.l"
+#line 55 "lex.l"
 { preprocerror(yytext); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 49 "lex.l"
+#line 56 "lex.l"
 { yyline++; BEGIN 0; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 50 "lex.l"
+#line 57 "lex.l"
 { addvar(yytext); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 51 "lex.l"
-{ cmd = newcmd(yytext); 
-				state = (strcmp(yytext,"DEFAULT")==0) ? 1 : 0;
+#line 58 "lex.l"
+{ cmd = newcmd(yytext);
+				state = strcmp(yytext, "DEFAULT") == 0 ? 1 : 0;
 				BEGIN ARGS; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 54 "lex.l"
+#line 61 "lex.l"
 BEGIN ARGS;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 55 "lex.l"
+#line 62 "lex.l"
 state++;
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 56 "lex.l"
+#line 63 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 57 "lex.l"
+#line 64 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 58 "lex.l"
+#line 65 "lex.l"
 addarg(state, cmd, yytext);
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 59 "lex.l"
+#line 66 "lex.l"
 ;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 60 "lex.l"
+#line 67 "lex.l"
 ECHO;
 	YY_BREAK
-#line 2359 "lex.c"
+#line 2366 "lex.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ARGS):
 	yyterminate();
@@ -3320,7 +3327,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 60 "lex.l"
+#line 67 "lex.l"
 
 
 /* ' for emacs */
@@ -3339,9 +3346,12 @@ msg(const char *format, ...)
     va_start(ap);
     s = va_arg(ap, char *);
     fprintf(stderr, "line %d: ", yyline);
+    /* Flawfinder: ignore (vfprintf) */
     vfprintf(stderr, s, ap);
     fputc('\n', stderr);
     va_end(ap);
+#else
+    UNUSED(format);
 #endif
 }
 
@@ -3355,21 +3365,25 @@ expandvars(const char *instr)
 	fatal(1, "Unable to allocate variable expansion buffer");
 
     while (*instr)
-	if (isupper(*instr) || *instr == '_') {
+	if (isupper((int)*instr) || *instr == '_') {
 	    const char *mark = instr;
 	    var_t *var;
 
 	    while (*instr
-		   && (isupper(*instr) || isdigit(*instr) || *instr == '_'))
+		   && (isupper((int)*instr) || isdigit((int)*instr)
+		       || *instr == '_'))
 		++instr;
 	    for (var = Variables; var != 0; var = var->next) {
+		/* Flawfinder: ignore (strlen) */
 		int l = strlen(var->name);
 
 		if (instr - mark > l)
 		    l = instr - mark;
 		if (!strncmp(mark, var->name, l)) {
 		    str[i] = 0;
-		    strcat(str, var->value);
+		    /* Flawfinder: fix (strcat) */
+		    strlcat(str, var->value, VAR_EXPAND_LEN);
+		    /* Flawfinder: ignore (strlen) */
 		    i += strlen(var->value);
 		    break;
 		}
@@ -3405,15 +3419,16 @@ preproc(const char *str)
 void
 addvar(const char *str)
 {
+    /* Flawfinder: ignore (char) */
     char name[VAR_NAME_LEN], value[VAR_EXPAND_LEN];
     const char *eq = strchr(str, '=');
 
     if (eq && str - eq < VAR_NAME_LEN) {
-	int i, o;
+	int i, o, len;
 	var_t *var;
 
-	strncpy(name, str, eq - str);
-	name[eq - str] = 0;
+	/* Flawfinder: fix (strncpy) */
+	strlcpy(name, str, MIN((size_t) (eq - str + 1), sizeof(name)));
 
 	for (o = 0, i = eq - str + 1; o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
 	    if (str[i] == '\\') {
@@ -3445,9 +3460,12 @@ addvar(const char *str)
 
 	if ((var = (var_t *) malloc(sizeof(var_t))) == NULL)
 	    fatal(1, "Unable to allocate var_t");
-	if ((var->name = malloc(strlen(name) + 1)) == NULL)
+	/* Flawfinder: fix (strlen) */
+	len = strlen(name) + 1;
+	if ((var->name = malloc(len)) == NULL)	/* expected-warning */
 	    fatal(1, "Unable to allocate variable name");
-	strcpy(var->name, name);
+	/* Flawfinder: fix (strcpy) */
+	strlcpy(var->name, name, len);
 	var->value = expandvars(value);
 	var->next = 0;
 
@@ -3465,9 +3483,11 @@ addvar(const char *str)
 static void
 addquotedarg(int state, cmd_t * cmd, const char *instr)
 {
+    /* Flawfinder: ignore (char) */
     char buffer[MAXSTRLEN];
     int i, o, q;
 
+    /* Flawfinder: ignore (strlen) */
     if (strlen(instr) + 2 > MAXSTRLEN) {
 	fatal(1, "Quoted argument too long\n");
 	exit(1);
@@ -3499,7 +3519,7 @@ addarg(int state, cmd_t * cmd, const char *instr)
     char *str = expandvars(instr);
 
     if (state == 0) {
-	msg("cmd='%s' add arg '%s'", cmd->name, str);
+	_msg(("cmd='%s' add arg '%s'", cmd->name, str));
 	if (cmd->margs == cmd->nargs) {
 	    cmd->margs += cmd->margs;
 	    cmd->args = (char **)realloc(cmd->args,
@@ -3509,7 +3529,7 @@ addarg(int state, cmd_t * cmd, const char *instr)
 	}
 	cmd->args[cmd->nargs++] = savestr(str);
     } else if (state == 1) {
-	msg("cmd='%s' add opt '%s'", cmd->name, str);
+	_msg(("cmd='%s' add opt '%s'", cmd->name, str));
 	if (cmd->mopts == cmd->nopts) {
 	    cmd->mopts += cmd->mopts;
 	    cmd->opts = (char **)realloc(cmd->opts,
@@ -3527,12 +3547,15 @@ addarg(int state, cmd_t * cmd, const char *instr)
 char *
 savestr(char *str)
 {
-    char *s = (char *)malloc(strlen(str) + 1);
+    /* Flawfinder: ignore (strlen) */
+    size_t len = strlen(str) + 1;
+    char *s = (char *)malloc(len);
 
     if (s == NULL)
 	fatal(1, "No string space");
 
-    strcpy(s, str);
+    /* Flawfinder: fix (strcpy) */
+    strlcpy(s, str, len);
     return s;
 }
 
@@ -3558,6 +3581,18 @@ alloccmd(char *name)
     return cmd;
 }
 
+void
+freecmd(cmd_t *cmd)
+{
+    if (cmd == NULL)
+	return;
+
+    free(cmd->name);
+    free(cmd->args);
+    free(cmd->opts);
+    free(cmd);
+}
+
 static cmd_t *
 newcmd(char *name)
 {
@@ -3567,7 +3602,6 @@ newcmd(char *name)
     First = cmd;
 
     return cmd;
-
 }
 
 int
@@ -3583,6 +3617,7 @@ ReadFile(char *file)
 	logger(LOG_ERR, "Permission problems on %s", file);
 	return 0;
     }
+    /* Flawfinder: ignore (fopen) race condition */
     if ((fd = fopen(file, "r")) == NULL)
 	return 0;
 
@@ -3593,10 +3628,11 @@ ReadFile(char *file)
 }
 
 int
-CountArgs(cmd_t *cmd)
+CountArgs(cmd_t * cmd)
 {
     int i, val;
     int wild = 0, max = 0;
+    /* Flawfinder: ignore (char) */
     char *cp, *np, str[MAXSTRLEN];
 
     for (i = 0; i < cmd->nargs; i++) {
@@ -3615,13 +3651,14 @@ CountArgs(cmd_t *cmd)
 		cp++;
 		np = cp;
 
-		while (isdigit(*cp))
+		while (isdigit((int)*cp))
 		    cp++;
 		if ((cp - np) == 0)
 		    continue;
-		strncpy(str, np, cp - np);
-		str[cp - np] = '\0';
-		val = atoi(str);
+		/* Flawfinder: fix (strncpy) */
+		strlcpy(str, np, MIN((size_t) (cp - np + 1), sizeof(str)));
+		/* Flawfinder: fix (atoi -> strtolong) */
+		val = strtolong(str, 10);
 		if (val > max)
 		    max = val;
 	    }
@@ -3638,6 +3675,7 @@ cmpopts(char *a, char *b)
 {
     char *cp_a, *cp_b;
     int val_a, val_b;
+    /* Flawfinder: ignore (char) */
     char str_a[MAXSTRLEN], str_b[MAXSTRLEN];
 
     if (*a != '$' && *b != '$')
@@ -3650,10 +3688,10 @@ cmpopts(char *a, char *b)
     cp_a = ++a;
     cp_b = ++b;
     while ((*cp_a != '\0') && (*cp_a != '='))
-	if (!isdigit(*cp_a))
+	if (!isdigit((int)*cp_a))
 	    break;
     while ((*cp_b != '\0') && (*cp_b != '='))
-	if (!isdigit(*cp_b))
+	if (!isdigit((int)*cp_b))
 	    break;
 
     if (*cp_a != '=' && *cp_b != '=')
@@ -3663,12 +3701,14 @@ cmpopts(char *a, char *b)
     if (*cp_a != '=' && *cp_b == '=')
 	return 1;
 
-    strncpy(str_a, a, cp_a - a);
-    str_a[cp_a - a] = '\0';
-    val_a = atoi(str_a);
-    strncpy(str_b, b, cp_b - a);
-    str_a[cp_b - b] = '\0';
-    val_b = atoi(str_b);
+    /* flawfinder: fix (strncpy) */
+    strlcpy(str_a, a, MIN((size_t) (cp_a - a + 1), sizeof(str_a)));
+    /* flawfinder: fix (atoi -> strtolong) */
+    val_a = strtolong(str_a, 10);
+    /* flawfinder: fix (strncpy) */
+    strlcpy(str_b, b, MIN((size_t) (cp_b - a + 1), sizeof(str_b)));
+    /* Flawfinder: fix (atoi -> strtolong) */
+    val_b = strtolong(str_b, 10);
 
     if (val_a < val_b)
 	return -1;
@@ -3678,7 +3718,7 @@ cmpopts(char *a, char *b)
 }
 
 void
-	sortopts(cmd_t *cmd)
+sortopts(cmd_t * cmd)
 {
     qsort(cmd->opts, cmd->nopts, sizeof(char *),
 	  (int(*)(const void *, const void *))cmpopts);
@@ -3689,12 +3729,18 @@ cmd_t *
 BuildSingle(cmd_t * def, cmd_t * cmd)
 {
     cmd_t *new = alloccmd(cmd->name ? cmd->name : "");
+    /* Flawfinder: ignore (char) */
     char defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
     int i, j;
-    if (cmd == NULL)
+
+    if (cmd == NULL) {
+	freecmd(new);
 	return def;
-    if (def == NULL)
+    }
+    if (def == NULL) {
+	freecmd(new);
 	return cmd;
+    }
 
     for (i = 0; i < cmd->nargs; i++)
 	addarg(0, new, cmd->args[i]);
@@ -3703,19 +3749,21 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
 	int skipped = 0;
 
 	if ((cp = strchr(def->opts[i], '=')) == NULL)
-	    strcpy(defname, def->opts[i]);
+	    /* Flawfinder: fix (strcpy) */
+	    strlcpy(defname, def->opts[i], sizeof(defname));
 	else {
 	    int l = cp - def->opts[i];
-	    strncpy(defname, def->opts[i], l);
-	    defname[l] = '\0';
+	    /* Flawfinder: fix (strncpy) */
+	    strlcpy(defname, def->opts[i], MIN(l + 1, sizeof(defname)));
 	}
 	for (j = 0; j < cmd->nopts; j++) {
 	    if ((cp = strchr(cmd->opts[j], '=')) == NULL)
-		strcpy(optname, cmd->opts[j]);
+		/* Flawfinder: fix (strcpy) */
+		strlcpy(optname, cmd->opts[j], sizeof(optname));
 	    else {
 		int l = cp - cmd->opts[j];
-		strncpy(optname, cmd->opts[j], l);
-		optname[l] = '\0';
+		/* Flawfinder: fix (strncpy) */
+		strlcpy(optname, cmd->opts[j], MIN(l + 1, sizeof(optname)));
 	    }
 	    if (strcmp(defname, optname) == 0) {
 		skipped = 1;
