@@ -126,6 +126,7 @@ extern unsigned minimum_logging_level;
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
 char *strtolower(char *in);
+/* NOLINTNEXTLINE(runtime/int) */
 long strtolong(char *str, int base);
 
 int ReadFile(char *file);
