@@ -57,6 +57,7 @@ atov(char *str, int type)
 	    type = 10;
 	}
     }
+    // Flawfinder: ignore (strlen)
     for (; i < strlen(str); i++) {
 	c = str[i];
 	if (isdigit(c)) {
