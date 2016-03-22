@@ -215,6 +215,7 @@ regexp *regcomp(char *exp)
     register regexp *r;
     register char *scan;
     register char *longest;
+    /* cppcheck-suppress variableScope */
     register unsigned len;
     int flags;
 
@@ -249,6 +250,7 @@ regexp *regcomp(char *exp)
     regcode = r->program;
     regc(MAGIC);
     if (reg(0, &flags) == NULL)
+	/* cppcheck-suppress memleak Memory leak: r */
 	return (NULL);
 
     /* Dig out information for optimizations. */
