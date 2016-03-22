@@ -94,8 +94,8 @@ void *rpl_realloc(void *ptr, size_t n);
 
 typedef struct cmd_s {
     char *name;
-    int nargs, nopts;
-    int margs, mopts;
+    size_t nargs, nopts;
+    size_t margs, mopts;
     char **args, **opts;
     struct cmd_s *next;
 } cmd_t;
@@ -107,7 +107,7 @@ typedef struct var_s {
 
 typedef struct array_s {
     void **data;
-    int size, capacity;
+    size_t size, capacity;
 } array_t;
 
 /* functions to manage a dynamically extensible array of pointers */
@@ -117,12 +117,13 @@ void array_free(array_t * array);
 array_t *array_free_contents(array_t * array);
 void *array_push(array_t * array, void *object);
 void *array_pop(array_t * array);
-int array_extend(array_t * array, int capacity);
+int array_extend(array_t * array, size_t capacity);
 
 extern cmd_t *First, *Build(), *BuildSingle();
 extern var_t *Variables;
 extern unsigned minimum_logging_level;
 
+/* cppcheck-suppress noreturn */
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
 char *strtolower(char *in);

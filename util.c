@@ -37,7 +37,7 @@ array_free(array_t * array)
 array_t *
 array_free_contents(array_t * array)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < array->size; ++i)
 	free(array->data[i]);
@@ -61,13 +61,13 @@ array_push(array_t * array, void *object)
 void *
 array_pop(array_t * array)
 {
-    if (array->size <= 0)
+    if (array->size == 0)
 	return NULL;
     return array->data[--array->size];
 }
 
 int
-array_extend(array_t * array, int capacity)
+array_extend(array_t * array, size_t capacity)
 {
     if (capacity < array->capacity)
 	return 0;
