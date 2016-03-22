@@ -137,6 +137,7 @@
  * but allows patterns to get big without disasters.
  */
 #define	OP(p)	(*(p))
+/* NOLINTNEXTLINE(whitespace/operators) */
 #define	NEXT(p)	(((*((p)+1)&0377)<<8) + (*((p)+2)&0377))
 #define	OPERAND(p)	((p) + 3)
 
@@ -171,6 +172,7 @@ static char *regparse;		/* Input-scan pointer. */
 static int regnpar;		/* () count. */
 static char regdummy;
 static char *regcode;		/* Code-emit pointer; &regdummy = don't. */
+/* NOLINTNEXTLINE(runtime/int) */
 static long regsize;		/* Code size. */
 
 /*
@@ -629,6 +631,7 @@ static char *regatom(int *flagp)
 			/* FIXME: Someday handle \1, \2, ... */
 			goto done;	/* Not quoted */
 		    default:
+			/* NOLINTNEXTLINE(whitespace/line_length) */
 			/* Backup point is \, scan                                                       * point is after it. */
 			regprev = regparse;
 			regparse++;
