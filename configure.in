@@ -14,6 +14,11 @@ AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
 AC_CHECK_FUNC([crypt], [], [AC_CHECK_LIB([crypt], [crypt], [], [AC_MSG_ERROR(Can't find crypt())])])
+AC_CHECK_FUNC([strlcat], [AC_DEFINE(HAVE_STRLCAT, [1], [Define to 1 if you have the `strlcat' function.])])
+AC_CHECK_FUNC([strlcpy], [AC_DEFINE(HAVE_STRLCPY, [1], [Define to 1 if you have the `strlcpy' function.])])
+AC_CHECK_FUNC([vsnprintf], [AC_DEFINE(HAVE_VSNPRINTF, [1], [Define to 1 if you have the `vsnprintf' function.])])
+AC_CHECK_LIB([bsd], [strlcat], [AC_DEFINE(HAVE_LIBBSD, [1], [Define to 1 if you have the `bsd' library (-lbsd)])
+	LIBS="$LIBS -lbsd"])
 
 OPENLOG_VOID=1
 AC_COMPILE_IFELSE(
@@ -63,8 +68,8 @@ if test "${enable_xauth}" != no; then
 	EXTRA_CPPFLAGS="$EXTRA_CPPFLAGS -DXAUTH=\\\"$enable_xauth\\\""
 fi
 
-AC_CHECK_LIB([fl], [yywrap])
-AC_SUBST(EXTRA_CPPFLAGS)
+AC_CHECK_LIB([fl], [yywrap], [], AC_CHECK_LIB([l], [yywrap], []))
+AC_SUBST([EXTRA_CPPFLAGS])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -86,7 +91,14 @@ AC_FUNC_REALLOC
 AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([gethostname getpass getspnam memset regcomp strchr strcspn vsnprintf])
+AC_CHECK_FUNCS([gethostname getpass getspnam memset regcomp strchr strcspn strdup strrchr strtol vsnprintf])
+
+if test "${am_cv_CC_dependencies_compiler_type}" = "aix"; then
+	EXTRA_WARN="-qsrcmsg -qinfo=all:noppt:noppc:noobs:nocnd"
+else
+	EXTRA_WARN=-Wall
+fi
+AC_SUBST([EXTRA_WARN])
 
 AC_CONFIG_FILES([Makefile op.list])
 AC_OUTPUT
