@@ -95,10 +95,12 @@ rpl_realloc(void *ptr, size_t n)
 }
 
 /* from man strtol(1) */
+/* NOLINTNEXTLINE(runtime/int) */
 long
 strtolong(char *str, int base)
 {
     char *endptr;
+    /* NOLINTNEXTLINE(runtime/int) */
     long val;
 
     errno = 0;			/* To distinguish success/failure after call */
