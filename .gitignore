@@ -1,9 +1,14 @@
+*.o
+*.tar.gz
+.*.swp
 .deps/
 Makefile
+\[config.h].in
+autom4te.cache/
 config.h
 config.log
 config.status
+lex.c
+op
 op.list
 stamp-h1
-*.o
-op

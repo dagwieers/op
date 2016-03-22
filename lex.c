@@ -8,7 +8,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 31
+#define YY_FLEX_SUBMINOR_VERSION 35
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -30,7 +30,15 @@
 
 /* C99 systems have <inttypes.h>. Non-C99 systems may or may not. */
 
-#if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+
+/* C99 says to define __STDC_LIMIT_MACROS before including stdint.h,
+ * if you want the limit (max/min) macros for int types. 
+ */
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS 1
+#endif
+
 #include <inttypes.h>
 typedef int8_t flex_int8_t;
 typedef uint8_t flex_uint8_t;
@@ -85,11 +93,12 @@ typedef unsigned int flex_uint32_t;
 
 #else	/* ! __cplusplus */
 
-#if __STDC__
+/* C99 requires __STDC__ to be defined as 1. */
+#if defined (__STDC__)
 
 #define YY_USE_CONST
 
-#endif	/* __STDC__ */
+#endif	/* defined (__STDC__) */
 #endif	/* ! __cplusplus */
 
 #ifdef YY_USE_CONST
@@ -134,6 +143,10 @@ typedef unsigned int flex_uint32_t;
 #define YY_BUF_SIZE 16384
 #endif
 
+/* The state buf must be large enough to hold one state per character in the main buffer.
+ */
+#define YY_STATE_BUF_SIZE   ((YY_BUF_SIZE + 2) * sizeof(yy_state_type))
+
 #ifndef YY_TYPEDEF_YY_BUFFER_STATE
 #define YY_TYPEDEF_YY_BUFFER_STATE
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
@@ -165,14 +178,9 @@ extern FILE *yyin, *yyout;
 
 #define unput(c) yyunput( c, (yytext_ptr)  )
 
-/* The following is because we cannot portably get our hands on size_t
- * (without autoconf's help, which isn't available because we want
- * flex-generated scanners to compile on their own).
- */
-
 #ifndef YY_TYPEDEF_YY_SIZE_T
 #define YY_TYPEDEF_YY_SIZE_T
-typedef unsigned int yy_size_t;
+typedef size_t yy_size_t;
 #endif
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
@@ -267,7 +275,7 @@ int yyleng;
 
 /* Points to current character in buffer. */
 static char *yy_c_buf_p = (char *) 0;
-static int yy_init = 1;		/* whether we need to initialize */
+static int yy_init = 0;		/* whether we need to initialize */
 static int yy_start = 0;	/* start state number */
 
 /* Flag which is used to allow yywrap()'s to do buffer switches
@@ -1984,6 +1992,7 @@ char *yytext;
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -1991,31 +2000,72 @@ char *yytext;
 #include <syslog.h>
 #include "defs.h"
 
-static cmd_t	*newcmd();
-char	*savestr();
+#if 0
+#define _msg(x) msg x
+#else
+#define _msg(x)
+#endif
+
+static cmd_t *newcmd();
+char *savestr();
 void addvar(const char *str);
 void preproc(const char *str);
 void preprocerror(const char *str);
-static void addquotedarg(int state, cmd_t *cmd, const char *instr);
-static void addarg(int state, cmd_t *cmd, const char *instr);
+static void addquotedarg(int state, cmd_t * cmd, const char *instr);
+static void addarg(int state, cmd_t * cmd, const char *instr);
 
-int	yyline = 1;
+int yyline = 1;
+
+#define YY_NO_INPUT
 
 
-#line 2006 "lex.c"
+#line 2023 "lex.c"
 
 #define INITIAL 0
 #define ARGS 1
 
+#ifndef YY_NO_UNISTD_H
 /* Special case for "unistd.h", since it is non-ANSI. We include it way
  * down here because we want the user's section 1 to have been scanned first.
  * The user has a chance to override it with an option.
  */
 #include <unistd.h>
+#endif
 
 #ifndef YY_EXTRA_TYPE
 #define YY_EXTRA_TYPE void *
 #endif
+
+static int yy_init_globals (void );
+
+/* Accessor methods to globals.
+   These are made visible to non-reentrant scanners for convenience. */
+
+int yylex_destroy (void );
+
+int yyget_debug (void );
+
+void yyset_debug (int debug_flag  );
+
+YY_EXTRA_TYPE yyget_extra (void );
+
+void yyset_extra (YY_EXTRA_TYPE user_defined  );
+
+FILE *yyget_in (void );
+
+void yyset_in  (FILE * in_str  );
+
+FILE *yyget_out (void );
+
+void yyset_out  (FILE * out_str  );
+
+int yyget_leng (void );
+
+char *yyget_text (void );
+
+int yyget_lineno (void );
+
+void yyset_lineno (int line_number  );
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -2029,8 +2079,6 @@ extern int yywrap (void );
 #endif
 #endif
 
-    static void yyunput (int c,char *buf_ptr  );
-    
 #ifndef yytext_ptr
 static void yy_flex_strncpy (char *,yyconst char *,int );
 #endif
@@ -2059,7 +2107,7 @@ static int input (void );
 /* This used to be an fputs(), but since the string might contain NUL's,
  * we now use fwrite().
  */
-#define ECHO (void) fwrite( yytext, yyleng, 1, yyout )
+#define ECHO do { if (fwrite( yytext, yyleng, 1, yyout )) {} } while (0)
 #endif
 
 /* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
@@ -2070,7 +2118,7 @@ static int input (void );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		size_t n; \
+		unsigned n; \
 		for ( n = 0; n < max_size && \
 			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
@@ -2155,16 +2203,16 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 38 "lex.l"
+#line 49 "lex.l"
 
 	int	state = 0;
 	cmd_t	*cmd = NULL;
 
-#line 2164 "lex.c"
+#line 2212 "lex.c"
 
-	if ( (yy_init) )
+	if ( !(yy_init) )
 		{
-		(yy_init) = 0;
+		(yy_init) = 1;
 
 #ifdef YY_USER_INIT
 		YY_USER_INIT;
@@ -2246,75 +2294,75 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 42 "lex.l"
+#line 53 "lex.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 43 "lex.l"
+#line 54 "lex.l"
 { preproc(yytext); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 44 "lex.l"
+#line 55 "lex.l"
 { preprocerror(yytext); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 45 "lex.l"
+#line 56 "lex.l"
 { yyline++; BEGIN 0; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 46 "lex.l"
+#line 57 "lex.l"
 { addvar(yytext); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 47 "lex.l"
-{ cmd = newcmd(yytext); 
-				state = (strcmp(yytext,"DEFAULT")==0) ? 1 : 0;
+#line 58 "lex.l"
+{ cmd = newcmd(yytext);
+				state = strcmp(yytext, "DEFAULT") == 0 ? 1 : 0;
 				BEGIN ARGS; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 50 "lex.l"
+#line 61 "lex.l"
 BEGIN ARGS;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 51 "lex.l"
+#line 62 "lex.l"
 state++;
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 52 "lex.l"
+#line 63 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 53 "lex.l"
+#line 64 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 54 "lex.l"
+#line 65 "lex.l"
 addarg(state, cmd, yytext);
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 55 "lex.l"
+#line 66 "lex.l"
 ;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 56 "lex.l"
+#line 67 "lex.l"
 ECHO;
 	YY_BREAK
-#line 2318 "lex.c"
+#line 2366 "lex.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ARGS):
 	yyterminate();
@@ -2501,7 +2549,7 @@ static int yy_get_next_buffer (void)
 
 	else
 		{
-			size_t num_to_read =
+			int num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
@@ -2546,7 +2594,7 @@ static int yy_get_next_buffer (void)
 
 		/* Read in more data. */
 		YY_INPUT( (&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]),
-			(yy_n_chars), num_to_read );
+			(yy_n_chars), (size_t) num_to_read );
 
 		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = (yy_n_chars);
 		}
@@ -2569,6 +2617,14 @@ static int yy_get_next_buffer (void)
 
 	else
 		ret_val = EOB_ACT_CONTINUE_SCAN;
+
+	if ((yy_size_t) ((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
+		/* Extend the array by 50%, plus the number we really need. */
+		yy_size_t new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1);
+		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc((void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf,new_size  );
+		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
+			YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
+	}
 
 	(yy_n_chars) += number_to_move;
 	YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[(yy_n_chars)] = YY_END_OF_BUFFER_CHAR;
@@ -2635,43 +2691,6 @@ static int yy_get_next_buffer (void)
 	yy_is_jam = (yy_current_state == 475);
 
 	return yy_is_jam ? 0 : yy_current_state;
-}
-
-    static void yyunput (int c, register char * yy_bp )
-{
-	register char *yy_cp;
-    
-    yy_cp = (yy_c_buf_p);
-
-	/* undo effects of setting up yytext */
-	*yy_cp = (yy_hold_char);
-
-	if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
-		{ /* need to shift things up to make room */
-		/* +2 for EOB chars. */
-		register int number_to_move = (yy_n_chars) + 2;
-		register char *dest = &YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[
-					YY_CURRENT_BUFFER_LVALUE->yy_buf_size + 2];
-		register char *source =
-				&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move];
-
-		while ( source > YY_CURRENT_BUFFER_LVALUE->yy_ch_buf )
-			*--dest = *--source;
-
-		yy_cp += (int) (dest - source);
-		yy_bp += (int) (dest - source);
-		YY_CURRENT_BUFFER_LVALUE->yy_n_chars =
-			(yy_n_chars) = YY_CURRENT_BUFFER_LVALUE->yy_buf_size;
-
-		if ( yy_cp < YY_CURRENT_BUFFER_LVALUE->yy_ch_buf + 2 )
-			YY_FATAL_ERROR( "flex scanner push-back overflow" );
-		}
-
-	*--yy_cp = (char) c;
-
-	(yytext_ptr) = yy_bp;
-	(yy_hold_char) = *yy_cp;
-	(yy_c_buf_p) = yy_cp;
 }
 
 #ifndef YY_NO_INPUT
@@ -2988,7 +3007,9 @@ static void yyensure_buffer_stack (void)
 		(yy_buffer_stack) = (struct yy_buffer_state**)yyalloc
 								(num_to_alloc * sizeof(struct yy_buffer_state*)
 								);
-		
+		if ( ! (yy_buffer_stack) )
+			YY_FATAL_ERROR( "out of dynamic memory in yyensure_buffer_stack()" );
+								  
 		memset((yy_buffer_stack), 0, num_to_alloc * sizeof(struct yy_buffer_state*));
 				
 		(yy_buffer_stack_max) = num_to_alloc;
@@ -3006,6 +3027,8 @@ static void yyensure_buffer_stack (void)
 								((yy_buffer_stack),
 								num_to_alloc * sizeof(struct yy_buffer_state*)
 								);
+		if ( ! (yy_buffer_stack) )
+			YY_FATAL_ERROR( "out of dynamic memory in yyensure_buffer_stack()" );
 
 		/* zero only the new slots.*/
 		memset((yy_buffer_stack) + (yy_buffer_stack_max), 0, grow_size * sizeof(struct yy_buffer_state*));
@@ -3050,16 +3073,16 @@ YY_BUFFER_STATE yy_scan_buffer  (char * base, yy_size_t  size )
 
 /** Setup the input buffer state to scan a string. The next call to yylex() will
  * scan from a @e copy of @a str.
- * @param str a NUL-terminated string to scan
+ * @param yystr a NUL-terminated string to scan
  * 
  * @return the newly allocated buffer state object.
  * @note If you want to scan bytes that may contain NUL values, then use
  *       yy_scan_bytes() instead.
  */
-YY_BUFFER_STATE yy_scan_string (yyconst char * str )
+YY_BUFFER_STATE yy_scan_string (yyconst char * yystr )
 {
     
-	return yy_scan_bytes(str,strlen(str) );
+	return yy_scan_bytes(yystr,strlen(yystr) );
 }
 
 /** Setup the input buffer state to scan the given bytes. The next call to yylex() will
@@ -3069,7 +3092,7 @@ YY_BUFFER_STATE yy_scan_string (yyconst char * str )
  * 
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE yy_scan_bytes  (yyconst char * bytes, int  len )
+YY_BUFFER_STATE yy_scan_bytes  (yyconst char * yybytes, int  _yybytes_len )
 {
 	YY_BUFFER_STATE b;
 	char *buf;
@@ -3077,15 +3100,15 @@ YY_BUFFER_STATE yy_scan_bytes  (yyconst char * bytes, int  len )
 	int i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
-	n = len + 2;
+	n = _yybytes_len + 2;
 	buf = (char *) yyalloc(n  );
 	if ( ! buf )
 		YY_FATAL_ERROR( "out of dynamic memory in yy_scan_bytes()" );
 
-	for ( i = 0; i < len; ++i )
-		buf[i] = bytes[i];
+	for ( i = 0; i < _yybytes_len; ++i )
+		buf[i] = yybytes[i];
 
-	buf[len] = buf[len+1] = YY_END_OF_BUFFER_CHAR;
+	buf[_yybytes_len] = buf[_yybytes_len+1] = YY_END_OF_BUFFER_CHAR;
 
 	b = yy_scan_buffer(buf,n );
 	if ( ! b )
@@ -3206,6 +3229,34 @@ void yyset_debug (int  bdebug )
         yy_flex_debug = bdebug ;
 }
 
+static int yy_init_globals (void)
+{
+        /* Initialization is the same as for the non-reentrant scanner.
+     * This function is called from yylex_destroy(), so don't allocate here.
+     */
+
+    (yy_buffer_stack) = 0;
+    (yy_buffer_stack_top) = 0;
+    (yy_buffer_stack_max) = 0;
+    (yy_c_buf_p) = (char *) 0;
+    (yy_init) = 0;
+    (yy_start) = 0;
+
+/* Defined in main.c */
+#ifdef YY_STDINIT
+    yyin = stdin;
+    yyout = stdout;
+#else
+    yyin = (FILE *) 0;
+    yyout = (FILE *) 0;
+#endif
+
+    /* For future reference: Set errno on error, since we are called by
+     * yylex_init()
+     */
+    return 0;
+}
+
 /* yylex_destroy is for both reentrant and non-reentrant scanners. */
 int yylex_destroy  (void)
 {
@@ -3221,6 +3272,10 @@ int yylex_destroy  (void)
 	yyfree((yy_buffer_stack) );
 	(yy_buffer_stack) = NULL;
 
+    /* Reset the globals. This is important in a non-reentrant scanner so the next time
+     * yylex() is called, initialization will occur. */
+    yy_init_globals( );
+
     return 0;
 }
 
@@ -3232,7 +3287,7 @@ int yylex_destroy  (void)
 static void yy_flex_strncpy (char* s1, yyconst char * s2, int n )
 {
 	register int i;
-    	for ( i = 0; i < n; ++i )
+	for ( i = 0; i < n; ++i )
 		s1[i] = s2[i];
 }
 #endif
@@ -3241,7 +3296,7 @@ static void yy_flex_strncpy (char* s1, yyconst char * s2, int n )
 static int yy_flex_strlen (yyconst char * s )
 {
 	register int n;
-    	for ( n = 0; s[n]; ++n )
+	for ( n = 0; s[n]; ++n )
 		;
 
 	return n;
@@ -3272,409 +3327,471 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#undef YY_NEW_FILE
-#undef YY_FLUSH_BUFFER
-#undef yy_set_bol
-#undef yy_new_buffer
-#undef yy_set_interactive
-#undef YY_DO_BEFORE_ACTION
+#line 67 "lex.l"
 
-#ifdef YY_DECL_IS_OURS
-#undef YY_DECL_IS_OURS
-#undef YY_DECL
-#endif
-#line 56 "lex.l"
 
+/* ' for emacs */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
 
-void msg(const char *format, ...)
+void
+msg(const char *format, ...)
 {
 #if 0
-	va_list	ap;
-	char	*s;
+    va_list ap;
+    char *s;
 
-	va_start(ap);
-	s = va_arg(ap, char *);
-	fprintf(stderr,"line %d: ",yyline);
-	vfprintf(stderr, s, ap);
-	fputc('\n', stderr);
-	va_end(ap);
+    va_start(ap);
+    s = va_arg(ap, char *);
+    fprintf(stderr, "line %d: ", yyline);
+    /* Flawfinder: ignore (vfprintf) */
+    vfprintf(stderr, s, ap);
+    fputc('\n', stderr);
+    va_end(ap);
+#else
+    UNUSED(format);
 #endif
 }
 
-char *expandvars(const char *instr) {
-char *str = (char*)malloc(VAR_EXPAND_LEN);
-int i = 0;
+char *
+expandvars(const char *instr)
+{
+    char *str = (char *)malloc(VAR_EXPAND_LEN);
+    int i = 0;
 
-	if (str == NULL)
-		fatal(1, "Unable to allocate variable expansion buffer");
+    if (str == NULL)
+	fatal(1, "Unable to allocate variable expansion buffer");
 
-	while (*instr)
-		if (isupper(*instr) || *instr == '_') {
-		const char *mark = instr;
-		var_t *var;
+    while (*instr)
+	if (isupper((int)*instr) || *instr == '_') {
+	    const char *mark = instr;
+	    var_t *var;
 
-			while (*instr && (isupper(*instr) || isdigit(*instr) || *instr == '_'))
-				++instr;
-			for (var = Variables; var != 0; var = var->next) {
-			int l = strlen(var->name);
+	    while (*instr
+		   && (isupper((int)*instr) || isdigit((int)*instr)
+		       || *instr == '_'))
+		++instr;
+	    for (var = Variables; var != 0; var = var->next) {
+		/* Flawfinder: ignore (strlen) */
+		int l = strlen(var->name);
 
-				if (instr - mark > l) l = instr - mark;
-				if (!strncmp(mark, var->name, l)) {
-					str[i] = 0;
-					strcat(str, var->value);
-					i += strlen(var->value);
-					break;
-				}
-			}
-			if (!var) {
-				instr = mark + 1;
-				str[i++] = *mark;
-			}
-		} else
-			str[i++] = *instr++;
-	str[i] = 0;
-	return str;
+		if (instr - mark > l)
+		    l = instr - mark;
+		if (!strncmp(mark, var->name, l)) {
+		    str[i] = 0;
+		    /* Flawfinder: fix (strcat) */
+		    strlcat(str, var->value, VAR_EXPAND_LEN);
+		    /* Flawfinder: ignore (strlen) */
+		    i += strlen(var->value);
+		    break;
+		}
+	    }
+	    if (!var) {
+		instr = mark + 1;
+		str[i++] = *mark;
+	    }
+	} else
+	    str[i++] = *instr++;
+    str[i] = 0;
+    return str;
 }
 
-void preprocerror(const char *str) {
-	fprintf(stderr, "Invalid preprocessor command '%s'\n", str);
-	exit(1);
+void
+preprocerror(const char *str)
+{
+    fprintf(stderr, "Invalid preprocessor command '%s'\n", str);
+    exit(1);
 }
 
-void preproc(const char *str) {
-	if (!strncmp(str, "%if", 3)) {
-	} else
-	if (!strncmp(str, "%elseif", 7)) {
-	} else
-	if (!strcmp(str, "%else")) {
-	} else
-	if (!strcmp(str, "%endif")) {
-	} else
-		preprocerror(str);
+void
+preproc(const char *str)
+{
+    if (!strncmp(str, "%if", 3)) {
+    } else if (!strncmp(str, "%elseif", 7)) {
+    } else if (!strcmp(str, "%else")) {
+    } else if (!strcmp(str, "%endif")) {
+    } else
+	preprocerror(str);
 }
 
-void addvar(const char *str) {
-char name[VAR_NAME_LEN], value[VAR_EXPAND_LEN];
-const char *eq = strchr(str, '=');
+void
+addvar(const char *str)
+{
+    /* Flawfinder: ignore (char) */
+    char name[VAR_NAME_LEN], value[VAR_EXPAND_LEN];
+    const char *eq = strchr(str, '=');
 
-	if (eq && str - eq < VAR_NAME_LEN) {
-	int i, o;
+    if (eq && str - eq < VAR_NAME_LEN) {
+	int i, o, len;
 	var_t *var;
 
-		strncpy(name, str, eq - str);
-		name[eq - str] = 0;
+	/* Flawfinder: fix (strncpy) */
+	strlcpy(name, str, MIN((size_t) (eq - str + 1), sizeof(name)));
 
-		for (o = 0, i = eq - str + 1; o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
-			if (str[i] == '\\') {
-				switch (str[++i]) {
-					case 'n' : value[o++] = '\n'; break;
-					case 'r' : value[o++] = '\r'; break;
-					case 't' : value[o++] = '\t'; break;
-					case 'a' : value[o++] = '\a'; break;
-					case 'b' : value[o++] = '\b'; break;
-					default : value[o++] = str[i]; break;
-				}
-			} else
-			if (str[i] == '"')
-				break;
-			else
-				value[o++] = str[i];
-		value[o++] = 0;
+	for (o = 0, i = eq - str + 1; o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
+	    if (str[i] == '\\') {
+		switch (str[++i]) {
+		case 'n':
+		    value[o++] = '\n';
+		    break;
+		case 'r':
+		    value[o++] = '\r';
+		    break;
+		case 't':
+		    value[o++] = '\t';
+		    break;
+		case 'a':
+		    value[o++] = '\a';
+		    break;
+		case 'b':
+		    value[o++] = '\b';
+		    break;
+		default:
+		    value[o++] = str[i];
+		    break;
+		}
+	    } else if (str[i] == '"')
+		break;
+	    else
+		value[o++] = str[i];
+	value[o++] = 0;
 
-		if ((var = (var_t*)malloc(sizeof(var_t))) == NULL)
-			fatal(1, "Unable to allocate var_t");
-		if ((var->name = malloc(strlen(name) + 1)) == NULL)
-			fatal(1, "Unable to allocate variable name");
-		strcpy(var->name, name);
-		var->value = expandvars(value);
-		var->next = 0;
+	if ((var = (var_t *) malloc(sizeof(var_t))) == NULL)
+	    fatal(1, "Unable to allocate var_t");
+	/* Flawfinder: fix (strlen) */
+	len = strlen(name) + 1;
+	if ((var->name = malloc(len)) == NULL)	/* expected-warning */
+	    fatal(1, "Unable to allocate variable name");
+	/* Flawfinder: fix (strcpy) */
+	strlcpy(var->name, name, len);
+	var->value = expandvars(value);
+	var->next = 0;
 
-		if (Variables) {
-		var_t *i;
+	if (Variables) {
+	    var_t *i;
 
-			for (i = Variables; i->next; i = i->next) ;
-			i->next = var;
-		} else
-			Variables = var;
+	    for (i = Variables; i->next; i = i->next) ;
+	    i->next = var;
 	} else
-		fatal(1, "Invalid alias");
+	    Variables = var;
+    } else
+	fatal(1, "Invalid alias");
 }
 
-static void addquotedarg(int state, cmd_t *cmd, const char *instr) {
-char buffer[MAXSTRLEN];
-int i, o, q;
+static void
+addquotedarg(int state, cmd_t * cmd, const char *instr)
+{
+    /* Flawfinder: ignore (char) */
+    char buffer[MAXSTRLEN];
+    int i, o, q;
 
-	if (strlen(instr) + 2 > MAXSTRLEN) {
-		fatal(1, "Quoted argument too long\n");
-		exit(1);
+    /* Flawfinder: ignore (strlen) */
+    if (strlen(instr) + 2 > MAXSTRLEN) {
+	fatal(1, "Quoted argument too long\n");
+	exit(1);
+    }
+    for (o = 0; !strchr("'\"", instr[o]); ++o)
+	buffer[o] = instr[o];
+    q = o;
+
+    for (i = o + 1; instr[i] && instr[i] != instr[q]; ++i, ++o) {
+	if (instr[i] == '\\') {
+	    int c = instr[++i];
+
+	    if (strchr("'\"", c)) {
+		buffer[o] = c;
+	    } else {
+		buffer[o++] = '\\';
+		buffer[o] = c;
+	    }
+	} else
+	    buffer[o] = instr[i];
+    }
+    buffer[o] = 0;
+    addarg(state, cmd, buffer);
+}
+
+static void
+addarg(int state, cmd_t * cmd, const char *instr)
+{
+    char *str = expandvars(instr);
+
+    if (state == 0) {
+	_msg(("cmd='%s' add arg '%s'", cmd->name, str));
+	if (cmd->margs == cmd->nargs) {
+	    cmd->margs += cmd->margs;
+	    cmd->args = (char **)realloc(cmd->args,
+					 sizeof(char *) * cmd->margs);
+	    if (cmd->args == NULL)
+		fatal(1, "Unable to groupw args");
 	}
-	for (o = 0; !strchr("'\"", instr[o]); ++o)
-		buffer[o] = instr[o];
-	q = o;
-
-	for (i = o + 1; instr[i] && instr[i] != instr[q]; ++i, ++o) {
-		if (instr[i] == '\\') {
-		int c = instr[++i];
-
-			if (strchr("'\"", c)) {
-				buffer[o] = c;
-			} else {
-				buffer[o++] = '\\';
-				buffer[o] = c;
-			}
-		} else
-			buffer[o] = instr[i];
+	cmd->args[cmd->nargs++] = savestr(str);
+    } else if (state == 1) {
+	_msg(("cmd='%s' add opt '%s'", cmd->name, str));
+	if (cmd->mopts == cmd->nopts) {
+	    cmd->mopts += cmd->mopts;
+	    cmd->opts = (char **)realloc(cmd->opts,
+					 sizeof(char *) * cmd->mopts);
+	    if (cmd->opts == NULL)
+		fatal(1, "Unable to groupw opts");
 	}
-	buffer[o] = 0;
-	addarg(state, cmd, buffer);
+	cmd->opts[cmd->nopts++] = savestr(str);
+    } else {
+	fatal(1, "bad state (%d) received\n", state);
+    }
+    free(str);
 }
 
-static void addarg(int state, cmd_t *cmd, const char *instr) {
-char *str = expandvars(instr);
-
-	if (state == 0) {
-		msg("cmd='%s' add arg '%s'",cmd->name,str);
-		if (cmd->margs == cmd->nargs)  {
-			cmd->margs += cmd->margs;
-			cmd->args = (char **)realloc(cmd->args, 
-					sizeof(char *) * cmd->margs);
-			if (cmd->args == NULL)
-				fatal(1, "Unable to groupw args");
-		}
-		cmd->args[cmd->nargs++] = savestr(str);
-	} else if (state == 1) {
-		msg("cmd='%s' add opt '%s'",cmd->name,str);
-		if (cmd->mopts == cmd->nopts) {
-			cmd->mopts += cmd->mopts;
-			cmd->opts = (char **)realloc(cmd->opts, 
-					sizeof(char *) * cmd->mopts);
-			if (cmd->opts == NULL)
-				fatal(1, "Unable to groupw opts");
-		}
-		cmd->opts[cmd->nopts++] = savestr(str);
-	} else {
-		fatal(1, "bad state (%d) received\n",state);
-	}
-	free(str);
-}
-
-char	*savestr(str)
-char	*str;
+char *
+savestr(char *str)
 {
-	char	*s = (char *)malloc(strlen(str)+1);
+    /* Flawfinder: ignore (strlen) */
+    size_t len = strlen(str) + 1;
+    char *s = (char *)malloc(len);
 
-	if (s == NULL) 
-		fatal(1, "No string space");
+    if (s == NULL)
+	fatal(1, "No string space");
 
-	strcpy(s, str);
-	return s;
+    /* Flawfinder: fix (strcpy) */
+    strlcpy(s, str, len);
+    return s;
 }
 
-static cmd_t	*alloccmd(char *name)
+static cmd_t *
+alloccmd(char *name)
 {
-	cmd_t	*cmd = (cmd_t *)malloc(sizeof(cmd_t));
+    cmd_t *cmd = (cmd_t *) malloc(sizeof(cmd_t));
 
-	if (cmd == NULL)
-		fatal(1, "Unable to alloc space for new command");
+    if (cmd == NULL)
+	fatal(1, "Unable to alloc space for new command");
 
-	cmd->name = savestr(name);
-	cmd->nargs = 0;		cmd->margs = 16;
-	cmd->nopts = 0;		cmd->mopts = 16;
-	cmd->args = (char **)malloc(sizeof(char *)*cmd->margs);
-	cmd->opts = (char **)malloc(sizeof(char *)*cmd->mopts);
+    cmd->name = savestr(name);
+    cmd->nargs = 0;
+    cmd->margs = 16;
+    cmd->nopts = 0;
+    cmd->mopts = 16;
+    cmd->args = (char **)malloc(sizeof(char *) * cmd->margs);
+    cmd->opts = (char **)malloc(sizeof(char *) * cmd->mopts);
 
-	if (cmd->args == NULL || cmd->opts == NULL)
-		fatal(1, "Unable to alloc args/opts");
+    if (cmd->args == NULL || cmd->opts == NULL)
+	fatal(1, "Unable to alloc args/opts");
 
-	return cmd;
+    return cmd;
 }
 
-static cmd_t	*newcmd(char *name)
+void
+freecmd(cmd_t *cmd)
 {
-	cmd_t	*cmd = alloccmd(name);
+    if (cmd == NULL)
+	return;
 
-	cmd->next = First;
-	First = cmd;
-
-	return cmd;
-
+    free(cmd->name);
+    free(cmd->args);
+    free(cmd->opts);
+    free(cmd);
 }
 
-int ReadFile(file)
-char	*file;
+static cmd_t *
+newcmd(char *name)
 {
-	struct stat	statbuf;
-	FILE		*fd;
-	
-	if ((stat(file, &statbuf) < 0))
-		return 0;
-	if ((statbuf.st_uid != 0) || /* Owned by root */
-			((statbuf.st_mode & 0077) != 0)) { /* SD - no perm */
-		logger(LOG_ERR, "Permission problems on %s", file);
-		return 0;
-	}
-	if ((fd = fopen(file,"r")) == NULL)
-		return 0;
+    cmd_t *cmd = alloccmd(name);
 
-	yyin = fd;
-	yylex();
+    cmd->next = First;
+    First = cmd;
 
-	return 1;
+    return cmd;
 }
 
-int CountArgs(cmd)
-cmd_t	*cmd;
+int
+ReadFile(char *file)
 {
-	int	i, val;
-	int	wild = 0, max = 0;
-	char	*cp, *np, str[MAXSTRLEN];
+    struct stat statbuf;
+    FILE *fd;
 
-	for (i = 0; i < cmd->nargs; i++) {
-		np = cmd->args[i];
-
-		while ((cp = strchr(np, '$')) != NULL) {
-			if ((cp != cmd->args[i]) && (*(cp-1) == '\\'))
-				np = cp + 1;
-			else {
-				if (*(cp+1) == '*') {
-					wild = 1;
-					++cp;
-					np = cp;
-					continue;
-				}
-				cp++;
-				np = cp;
-				
-				while (isdigit(*cp))
-					cp++;
-				if ((cp - np) == 0)
-					continue;
-				strncpy(str, np, cp - np);
-				str[cp - np] = '\0';
-				val = atoi(str);
-				if (val > max)
-					max = val;
-			}
-		}
-	}
-
-	if (wild)
-		return -max;
-	return max;
-}
-
-static int	cmpopts(a, b)
-char	*a, *b;
-{
-	char	*cp_a, *cp_b;
-	int	val_a, val_b;
-	char	str_a[MAXSTRLEN], str_b[MAXSTRLEN];
-
-	if (*a != '$' && *b != '$')
-		return 0;
-	if (*a == '$' && *b != '$')
-		return -1;
-	if (*a != '$' && *b == '$')
-		return  1;
-
-	cp_a = ++a;
-	cp_b = ++b;
-	while ((*cp_a != '\0') && (*cp_a != '='))
-		if (! isdigit(*cp_a))
-			break;
-	while ((*cp_b != '\0') && (*cp_b != '='))
-		if (! isdigit(*cp_b))
-			break;
-	
-	if (*cp_a != '=' && *cp_b != '=')
-		return 0;
-	if (*cp_a == '=' && *cp_b != '=')
-		return -1;
-	if (*cp_a != '=' && *cp_b == '=')
-		return  1;
-
-	strncpy(str_a, a, cp_a - a);
-	str_a[cp_a - a] = '\0';
-	val_a = atoi(str_a);
-	strncpy(str_b, b, cp_b - a);
-	str_a[cp_b - b] = '\0';
-	val_b = atoi(str_b);
-
-	if (val_a < val_b)
-		return -1;
-	if (val_a > val_b)
-		return  1;
+    if ((stat(file, &statbuf) < 0))
 	return 0;
+    if ((statbuf.st_uid != 0) ||	/* Owned by root */
+	((statbuf.st_mode & 0077) != 0)) {	/* SD - no perm */
+	logger(LOG_ERR, "Permission problems on %s", file);
+	return 0;
+    }
+    /* Flawfinder: ignore (fopen) race condition */
+    if ((fd = fopen(file, "r")) == NULL)
+	return 0;
+
+    yyin = fd;
+    yylex();
+
+    return 1;
 }
 
-void sortopts(cmd)
-cmd_t	*cmd;
+int
+CountArgs(cmd_t * cmd)
 {
-	qsort(cmd->opts, cmd->nopts, sizeof(char *), cmpopts);
+    int i, val;
+    int wild = 0, max = 0;
+    /* Flawfinder: ignore (char) */
+    char *cp, *np, str[MAXSTRLEN];
+
+    for (i = 0; i < cmd->nargs; i++) {
+	np = cmd->args[i];
+
+	while ((cp = strchr(np, '$')) != NULL) {
+	    if ((cp != cmd->args[i]) && (*(cp - 1) == '\\'))
+		np = cp + 1;
+	    else {
+		if (*(cp + 1) == '*') {
+		    wild = 1;
+		    ++cp;
+		    np = cp;
+		    continue;
+		}
+		cp++;
+		np = cp;
+
+		while (isdigit((int)*cp))
+		    cp++;
+		if ((cp - np) == 0)
+		    continue;
+		/* Flawfinder: fix (strncpy) */
+		strlcpy(str, np, MIN((size_t) (cp - np + 1), sizeof(str)));
+		/* Flawfinder: fix (atoi -> strtolong) */
+		val = strtolong(str, 10);
+		if (val > max)
+		    max = val;
+	    }
+	}
+    }
+
+    if (wild)
+	return -max;
+    return max;
+}
+
+static int
+cmpopts(char *a, char *b)
+{
+    char *cp_a, *cp_b;
+    int val_a, val_b;
+    /* Flawfinder: ignore (char) */
+    char str_a[MAXSTRLEN], str_b[MAXSTRLEN];
+
+    if (*a != '$' && *b != '$')
+	return 0;
+    if (*a == '$' && *b != '$')
+	return -1;
+    if (*a != '$' && *b == '$')
+	return 1;
+
+    cp_a = ++a;
+    cp_b = ++b;
+    while ((*cp_a != '\0') && (*cp_a != '='))
+	if (!isdigit((int)*cp_a))
+	    break;
+    while ((*cp_b != '\0') && (*cp_b != '='))
+	if (!isdigit((int)*cp_b))
+	    break;
+
+    if (*cp_a != '=' && *cp_b != '=')
+	return 0;
+    if (*cp_a == '=' && *cp_b != '=')
+	return -1;
+    if (*cp_a != '=' && *cp_b == '=')
+	return 1;
+
+    /* flawfinder: fix (strncpy) */
+    strlcpy(str_a, a, MIN((size_t) (cp_a - a + 1), sizeof(str_a)));
+    /* flawfinder: fix (atoi -> strtolong) */
+    val_a = strtolong(str_a, 10);
+    /* flawfinder: fix (strncpy) */
+    strlcpy(str_b, b, MIN((size_t) (cp_b - a + 1), sizeof(str_b)));
+    /* Flawfinder: fix (atoi -> strtolong) */
+    val_b = strtolong(str_b, 10);
+
+    if (val_a < val_b)
+	return -1;
+    if (val_a > val_b)
+	return 1;
+    return 0;
+}
+
+void
+sortopts(cmd_t * cmd)
+{
+    qsort(cmd->opts, cmd->nopts, sizeof(char *),
+	  (int(*)(const void *, const void *))cmpopts);
 }
 
 /* Build a new command but don't merge it into the global list */
-cmd_t	*BuildSingle(cmd_t *def, cmd_t *cmd)
+cmd_t *
+BuildSingle(cmd_t * def, cmd_t * cmd)
 {
-	cmd_t	*new = alloccmd(cmd->name ? cmd->name : "");
-	char	defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
-	int		i, j;
-	if (cmd == NULL)
-		return def;
-	if (def == NULL)
-		return cmd;
+    cmd_t *new = alloccmd(cmd->name ? cmd->name : "");
+    /* Flawfinder: ignore (char) */
+    char defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
+    int i, j;
 
-	for (i = 0; i < cmd->nargs; i++)
-		addarg(0, new, cmd->args[i]);
+    if (cmd == NULL) {
+	freecmd(new);
+	return def;
+    }
+    if (def == NULL) {
+	freecmd(new);
+	return cmd;
+    }
 
-	for (i = 0; i < def->nopts; i++) {
+    for (i = 0; i < cmd->nargs; i++)
+	addarg(0, new, cmd->args[i]);
+
+    for (i = 0; i < def->nopts; i++) {
 	int skipped = 0;
 
-		if ((cp = strchr(def->opts[i], '=')) == NULL)
-			strcpy(defname, def->opts[i]);
-		else {
-			int	l = cp - def->opts[i];
-			strncpy(defname, def->opts[i], l);
-			defname[l] = '\0';
-		}
-		for (j = 0; j < cmd->nopts; j++) {
-			if ((cp = strchr(cmd->opts[j], '=')) == NULL)
-				strcpy(optname, cmd->opts[j]);
-			else {
-				int	l = cp - cmd->opts[j];
-				strncpy(optname, cmd->opts[j], l);
-				optname[l] = '\0';
-			}
-			if (strcmp(defname, optname) == 0) {
-				skipped = 1;
-				break;
-			}
-		}
-		if (skipped) continue;
-		if (def->opts[i][0] != '\0')
-			addarg(1, new, def->opts[i]);
+	if ((cp = strchr(def->opts[i], '=')) == NULL)
+	    /* Flawfinder: fix (strcpy) */
+	    strlcpy(defname, def->opts[i], sizeof(defname));
+	else {
+	    int l = cp - def->opts[i];
+	    /* Flawfinder: fix (strncpy) */
+	    strlcpy(defname, def->opts[i], MIN(l + 1, sizeof(defname)));
 	}
-	for (j = 0; j < cmd->nopts; j++)
-		addarg(1, new, cmd->opts[j]);
+	for (j = 0; j < cmd->nopts; j++) {
+	    if ((cp = strchr(cmd->opts[j], '=')) == NULL)
+		/* Flawfinder: fix (strcpy) */
+		strlcpy(optname, cmd->opts[j], sizeof(optname));
+	    else {
+		int l = cp - cmd->opts[j];
+		/* Flawfinder: fix (strncpy) */
+		strlcpy(optname, cmd->opts[j], MIN(l + 1, sizeof(optname)));
+	    }
+	    if (strcmp(defname, optname) == 0) {
+		skipped = 1;
+		break;
+	    }
+	}
+	if (skipped)
+	    continue;
+	if (def->opts[i][0] != '\0')
+	    addarg(1, new, def->opts[i]);
+    }
+    for (j = 0; j < cmd->nopts; j++)
+	addarg(1, new, cmd->opts[j]);
 
-	/* sortopts(new); */
+    /* sortopts(new); */
 
-	return new;
+    return new;
 }
 
-
 /* Build a new command *and* merge it with the global command list */
-cmd_t	*Build(cmd_t *def, cmd_t *cmd)
+cmd_t *
+Build(cmd_t * def, cmd_t * cmd)
 {
-	cmd_t *new = 	BuildSingle(def, cmd);
+    cmd_t *new = BuildSingle(def, cmd);
 
-	new->next = First;
-	First = new;
+    new->next = First;
+    First = new;
 
-	return new;
+    return new;
 }
 
