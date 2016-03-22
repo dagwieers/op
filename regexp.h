@@ -9,19 +9,19 @@
 
 #define NSUBEXP  20
 typedef struct regexp {
-	char *startp[NSUBEXP];
-	char *endp[NSUBEXP];
-	char regstart;		/* Internal use only. */
-	char reganch;		/* Internal use only. */
-	char *regmust;		/* Internal use only. */
-	int regmlen;		/* Internal use only. */
-	char program[1];	/* Unwarranted chumminess with compiler. */
+    char *startp[NSUBEXP];
+    char *endp[NSUBEXP];
+    char regstart;		/* Internal use only. */
+    char reganch;		/* Internal use only. */
+    char *regmust;		/* Internal use only. */
+    int regmlen;		/* Internal use only. */
+    char program[1];		/* Unwarranted chumminess with compiler. */
 } regexp;
 
-regexp *regcomp( char *exp );
-int regexec( regexp *prog, char *string );
-void regerror( char *s );
-void regsub(regexp *prog, char *source, char *dest);
+regexp *regcomp(char *exp);
+int regexec(regexp * prog, char *string);
+void regerror(char *s);
+void regsub(regexp * prog, char *source, char *dest);
 
 /*
  * The first byte of the regexp internal "program" is actually this magic
@@ -30,4 +30,3 @@ void regsub(regexp *prog, char *source, char *dest);
 #define	MAGIC	0234
 
 #endif
-
