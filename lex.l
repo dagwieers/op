@@ -155,6 +155,7 @@ void
 addvar(const char *str)
 {
     /* Flawfinder: ignore (char) */
+    /* cppcheck-suppress variableScope */
     char name[VAR_NAME_LEN], value[VAR_EXPAND_LEN];
     const char *eq = strchr(str, '=');
 
@@ -368,6 +369,7 @@ CountArgs(cmd_t * cmd)
     int i, val;
     int wild = 0, max = 0;
     /* Flawfinder: ignore (char) */
+    /* cppcheck-suppress variableScope */
     char *cp, *np, str[MAXSTRLEN];
 
     for (i = 0; i < cmd->nargs; i++) {
@@ -468,6 +470,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
     char defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
     int i, j;
 
+    /* cppcheck-suppress nullPointer */
     if (cmd == NULL) {
 	freecmd(new);
 	return def;
