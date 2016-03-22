@@ -518,6 +518,7 @@ VerifyPermissions(cmd_t * cmd)
     char *cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
     regexp *reg1 = NULL;
     struct passwd *pw;
+    /* cppcheck-suppress variableScope */
     struct group *gr;
 
     /* root always has access - it is pointless refusing */
@@ -592,6 +593,7 @@ VerifyPermissions(cmd_t * cmd)
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
+	    /* cppcheck-suppress variableScope */
 	    /* Flawfinder: ignore (char) */
 	    char expiretime[13], *expirestart = strchr(str, '/');
 
@@ -644,6 +646,8 @@ VerifyPermissions(cmd_t * cmd)
 	}
     }
     if (reg1 != NULL) {
+	/* cppcheck-suppress doubleFree
+	   Memory pointed to by 'reg1' is freed twice. */
 	free(reg1);
 	reg1 = NULL;
     }
@@ -881,10 +885,13 @@ int
 Go(cmd_t * cmd, int num, int argc, char **argv)
 {
     extern char **environ;
+    /* cppcheck-suppress variableScope */
     int i, j, flag, val, len = 0;
+    /* cppcheck-suppress variableScope */
     char *cp, *np;
     struct passwd *pw;
     struct group *gr;
+    /* cppcheck-suppress variableScope */
     int ngroups = 0;
     gid_t gidset[NGROUPS_MAX];
     int curenv = 0, curarg = 0;
@@ -901,6 +908,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
     /* Flawfinder: ignore (getenv) */
     if (getenv("DISPLAY") != NULL && (cp = FindOpt(cmd, "xauth")) != NULL) {
 	struct passwd *currentpw;
+	/* cppcheck-suppress variableScope */
 	/* Flawfinder: ignore (char) */
 	char tmpxauth[MAXSTRLEN], xauth[MAXSTRLEN], cxauth[MAXSTRLEN], *display;
 	int status;
@@ -1174,6 +1182,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
 	struct passwd *pwbuf;
 	struct group *grbuf;
 	struct stat statbuf;
+	/* cppcheck-suppress variableScope */
 	char *ptr;
 	/* Flawfinder: ignore (char) */
 	char usergroup[MAXSTRLEN];
