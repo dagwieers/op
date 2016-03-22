@@ -3359,7 +3359,7 @@ char *
 expandvars(const char *instr)
 {
     char *str = (char *)malloc(VAR_EXPAND_LEN);
-    int i = 0;
+    size_t i = 0;
 
     if (str == NULL)
 	fatal(1, "Unable to allocate variable expansion buffer");
@@ -3375,7 +3375,7 @@ expandvars(const char *instr)
 		++instr;
 	    for (var = Variables; var != 0; var = var->next) {
 		/* Flawfinder: ignore (strlen) */
-		int l = strlen(var->name);
+		size_t l = strlen(var->name);
 
 		if (instr - mark > l)
 		    l = instr - mark;
@@ -3425,7 +3425,7 @@ addvar(const char *str)
     const char *eq = strchr(str, '=');
 
     if (eq && str - eq < VAR_NAME_LEN) {
-	int i, o, len;
+	size_t i, o, len;
 	var_t *var;
 
 	/* Flawfinder: fix (strncpy) */
@@ -3486,7 +3486,7 @@ addquotedarg(int state, cmd_t * cmd, const char *instr)
 {
     /* Flawfinder: ignore (char) */
     char buffer[MAXSTRLEN];
-    int i, o, q;
+    size_t i, o, q;
 
     /* Flawfinder: ignore (strlen) */
     if (strlen(instr) + 2 > MAXSTRLEN) {
@@ -3631,8 +3631,10 @@ ReadFile(char *file)
 int
 CountArgs(cmd_t * cmd)
 {
-    int i, val;
-    int wild = 0, max = 0;
+    size_t i;
+    /* NOLINTNEXTLINE(runtime/int) */
+    long val, max = 0;
+    int wild = 0;
     /* Flawfinder: ignore (char) */
     /* cppcheck-suppress variableScope */
     char *cp, *np, str[MAXSTRLEN];
@@ -3676,7 +3678,8 @@ static int
 cmpopts(char *a, char *b)
 {
     char *cp_a, *cp_b;
-    int val_a, val_b;
+    /* NOLINTNEXTLINE(runtime/int) */
+    long val_a, val_b;
     /* Flawfinder: ignore (char) */
     char str_a[MAXSTRLEN], str_b[MAXSTRLEN];
 
@@ -3733,7 +3736,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
     cmd_t *new = alloccmd(cmd->name ? cmd->name : "");
     /* Flawfinder: ignore (char) */
     char defname[MAXSTRLEN], optname[MAXSTRLEN], *cp;
-    int i, j;
+    size_t i, j;
 
     /* cppcheck-suppress nullPointer */
     if (cmd == NULL) {
@@ -3755,7 +3758,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
 	    /* Flawfinder: fix (strcpy) */
 	    strlcpy(defname, def->opts[i], sizeof(defname));
 	else {
-	    int l = cp - def->opts[i];
+	    size_t l = cp - def->opts[i];
 	    /* Flawfinder: fix (strncpy) */
 	    strlcpy(defname, def->opts[i], MIN(l + 1, sizeof(defname)));
 	}
@@ -3764,7 +3767,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
 		/* Flawfinder: fix (strcpy) */
 		strlcpy(optname, cmd->opts[j], sizeof(optname));
 	    else {
-		int l = cp - cmd->opts[j];
+		size_t l = cp - cmd->opts[j];
 		/* Flawfinder: fix (strncpy) */
 		strlcpy(optname, cmd->opts[j], MIN(l + 1, sizeof(optname)));
 	    }
