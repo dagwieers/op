@@ -276,8 +276,10 @@ regexp *regcomp(char *exp)
 	    longest = NULL;
 	    len = 0;
 	    for (; scan != NULL; scan = regnext(scan))
+		/* Flawfinder: ignore (strlen) */
 		if (OP(scan) == EXACTLY && strlen(OPERAND(scan)) >= len) {
 		    longest = OPERAND(scan);
+		    /* Flawfinder: ignore (strlen) */
 		    len = strlen(OPERAND(scan));
 		}
 	    r->regmust = longest;
@@ -899,16 +901,16 @@ static int /* 0 failure, 1 success */ regmatch(char *prog)
 	    break;
 	case WORDA:
 	    /* Must be looking at a letter, digit, or _ */
-	    if ((!isalnum(*reginput)) && *reginput != '_')
+	    if ((!isalnum((int)*reginput)) && *reginput != '_')
 		return (0);
 	    /* Prev must be BOL or nonword */
 	    if (reginput > regbol &&
-		(isalnum(reginput[-1]) || reginput[-1] == '_'))
+		(isalnum((int)reginput[-1]) || reginput[-1] == '_'))
 		return (0);
 	    break;
 	case WORDZ:
 	    /* Must be looking at non letter, digit, or _ */
-	    if (isalnum(*reginput) || *reginput == '_')
+	    if (isalnum((int)*reginput) || *reginput == '_')
 		return (0);
 	    /* We don't care what the previous char was */
 	    break;
@@ -925,6 +927,7 @@ static int /* 0 failure, 1 success */ regmatch(char *prog)
 		/* Inline the first character, for speed. */
 		if (*opnd != *reginput)
 		    return (0);
+		/* Flawfinder: ignore (strlen) */
 		len = strlen(opnd);
 		if (len > 1 && strncmp(opnd, reginput, len) != 0)
 		    return (0);
@@ -1081,6 +1084,7 @@ static int regrepeat(char *p)
     opnd = OPERAND(p);
     switch (OP(p)) {
     case ANY:
+	/* Flawfinder: ignore (strlen) */
 	count = strlen(scan);
 	scan += count;
 	break;
@@ -1182,9 +1186,11 @@ void regdump(regexp * r)
 static char *regprop(char *op)
 {
     register char *p = NULL;
+    /* Flawfinder: ignore (char) */
     static char buf[50];
 
-    (void)strcpy(buf, ":");
+    /* Flawfinder: fix (strcpy) */
+    (void)strlcpy(buf, ":", sizeof(buf));
 
     switch (OP(op)) {
     case BOL:
@@ -1226,7 +1232,10 @@ static char *regprop(char *op)
     case OPEN + 7:
     case OPEN + 8:
     case OPEN + 9:
-	sprintf(buf + strlen(buf), "OPEN%d", OP(op) - OPEN);
+	/* Flawfinder: fix (strlen) */
+	len = strlen(buf);
+	/* Flawfinder: fix (sprintf) */
+	snprintf(buf + len, sizeof(buf) - len, "OPEN%d", OP(op) - OPEN);
 	p = NULL;
 	break;
     case CLOSE + 1:
@@ -1238,7 +1247,10 @@ static char *regprop(char *op)
     case CLOSE + 7:
     case CLOSE + 8:
     case CLOSE + 9:
-	sprintf(buf + strlen(buf), "CLOSE%d", OP(op) - CLOSE);
+	/* Flawfinder: fix (strlen) */
+	len = strlen(buf);
+	/* Flawfinder: fix (sprintf) */
+	snprintf(buf + len, sizeof(buf) - len, "CLOSE%d", OP(op) - CLOSE);
 	p = NULL;
 	break;
     case STAR:
@@ -1258,7 +1270,8 @@ static char *regprop(char *op)
 	break;
     }
     if (p != NULL)
-	(void)strcat(buf, p);
+	/* Flawfinder: fix (strcat) */
+	strlcat(buf, p, sizeof(buf));
     return (buf);
 }
 #endif
@@ -1356,7 +1369,8 @@ char *dest;
 	    *dst++ = c;
 	} else if (prog->startp[no] != NULL && prog->endp[no] != NULL) {
 	    len = prog->endp[no] - prog->startp[no];
-	    (void)strncpy(dst, prog->startp[no], len);
+	    /* Flawfinder: ignore (strncpy) */
+	    strncpy(dst, prog->startp[no], len);
 	    dst += len;
 	    if (len != 0 && *(dst - 1) == '\0') {	/* strncpy hit NUL. */
 		regerror("damaged match string");
