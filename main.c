@@ -12,6 +12,10 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <netdb.h>
+#ifdef __hpux
+extern int innetgr(__const char *__netgroup, __const char *__host,
+		   __const char *__user, __const char *__domain);
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -60,17 +64,17 @@ union config_record configure;
 #define	MAXENV	MAXARG
 
 extern char *savestr();
+/* Flawfinder: ignore */
 extern char *getpass(), *crypt();
 
-char *format_cmd(int argc, char **argv, char *retbuf, int buflen);
+char *format_cmd(int argc, char **argv, char *retbuf, /* UNUSED */ int buflen);
 char *GetCode();
-cmd_t *Find();
 int Verify(cmd_t * cmd, int num, int argc, char **argv);
 int VerifyPermissions(cmd_t * cmd);
 cmd_t *Find(char *name);
 char *FindOpt(cmd_t * cmd, char *str);
 void ListCommands();
-int Go(cmd_t * cmd, int num, int argc, char **argv);
+int Go(cmd_t * cmd, /* UNUSED */ int num, int argc, char **argv);
 cmd_t *First = NULL;
 var_t *Variables = NULL;
 char *realuser = NULL;
@@ -110,11 +114,11 @@ ListCommands()
     /*      first pass, get maximum command length and number of commands we have
        permission to use */
     for (cmd = First; cmd != NULL; cmd = cmd->next) {
-
 	if (strcmp(cmd->name, "DEFAULT")) {
 	    cmd_t *new = BuildSingle(def, cmd);
 
 	    if (VerifyPermissions(new) >= 0) {
+		/* Flawfinder: ignore (strlen) */
 		int l = strlen(new->name);
 
 		for (i = 0; i < cmds->size; ++i)
@@ -145,22 +149,28 @@ ListCommands()
 		    int j, len = 0;
 
 		    for (j = 0; j < cmd->nargs; ++j)
+			/* Flawfinder: ignore (strlen) */
 			len += strlen(cmd->args[j]) + 1;
 		    help = (char *)malloc(len);
-		    strcpy(help, cmd->args[0]);
+		    /* Flawfinder: fix (strcpy) */
+		    strlcpy(help, cmd->args[0], len);
 		    for (j = 1; j < cmd->nargs; ++j) {
-			strcat(help, " ");
+			/* Flawfinder: fix (strcat) */
+			strlcat(help, " ", len);
 			if (strchr(cmd->args[j], ' ')
 			    || strchr(cmd->args[j], '\t')) {
-			    strcat(help, "'");
-			    strcat(help, cmd->args[j]);
-			    strcat(help, "'");
+			    /* Flawfinder: fix (strcat) */
+			    strlcat(help, "'", len);
+			    strlcat(help, cmd->args[j], len);
+			    strlcat(help, "'", len);
 			} else
-			    strcat(help, cmd->args[j]);
+			    /* Flawfinder: fix (strcat) */
+			    strlcat(help, cmd->args[j], len);
 		    }
 		}
 		printf("%-*s", length + 2, new->name);
 		printf("%-*.*s", 77 - length, 77 - length, help);
+		/* Flawfinder: ignore (strlen) */
 		if (strlen(help) > 77 - length)
 		    printf("...\n");
 		else
@@ -183,7 +193,9 @@ ReadDir(char *dir)
 
 	while ((f = readdir(d))) {
 	    if (f->d_name[0] == '.'
+		/* Flawfinder: ignore (strlen) */
 		|| (strlen(f->d_name) > 5
+		    /* Flawfinder: ignore (strlen) */
 		    && strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
 		continue;
 	    if (!array_push(dir_list, savestr(f->d_name)))
@@ -192,9 +204,10 @@ ReadDir(char *dir)
 	closedir(d);
 	qsort(dir_list->data, dir_list->size, sizeof(void *), FileCompare);
 	for (i = 0; i < dir_list->size; ++i) {
+	    /* Flawfinder: ignore (char) */
 	    char full_path[PATH_MAX];
-	    strnprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR,
-		       (char *)dir_list->data[i]);
+	    snprintf(full_path, PATH_MAX, "%s/%s", OP_ACCESS_DIR,
+		     (char *)dir_list->data[i]);
 	    if (ReadFile(full_path))
 		successes++;
 	}
@@ -207,13 +220,16 @@ int
 main(int argc, char *argv[])
 {
     int num, argStart = 1;
+    /* Flawfinder: ignore (char) */
     char user[MAXSTRLEN];
     cmd_t *cmd, *def, *new;
     struct passwd *pw;
     int lflag = 0, hflag = 0, read_conf = 0, read_conf_dir = 0;
     char *uptr = NULL;
-    char cmd_s[MAXSTRLEN];
-    char *pcmd_s;
+    /* Flawfinder: ignore (char) */
+    /* XXX cppcheck unusedVariable:Unused variable: cmd_s, pcmd_s */
+    /* char cmd_s[MAXSTRLEN]; */
+    /* char *pcmd_s; */
 
     sigemptyset(&sig_mask);
     sigaddset(&sig_mask, SIGINT);
@@ -240,6 +256,7 @@ main(int argc, char *argv[])
 	    hflag++;
 	    argStart++;
 	} else if (strcmp("-u", argv[argStart]) == 0) {
+	    /* Flawfinder: ignore (strlen) */
 	    if (strlen(argv[argStart]) == 2) {
 		if (argStart + 1 >= argc)
 		    Usage();
@@ -249,6 +266,7 @@ main(int argc, char *argv[])
 	    argStart++;
 	} else if (strcmp("-uH", argv[argStart]) == 0) {
 	    hflag++;
+	    /* Flawfinder: ignore (strlen) */
 	    if (strlen(argv[argStart]) == 3) {
 		if (argStart + 1 >= argc)
 		    Usage();
@@ -258,6 +276,7 @@ main(int argc, char *argv[])
 	    argStart++;
 	} else if (strcmp("-Hu", argv[argStart]) == 0) {
 	    hflag++;
+	    /* Flawfinder: ignore (strlen) */
 	    if (strlen(argv[argStart]) == 3) {
 		if (argStart + 1 >= argc)
 		    Usage();
@@ -281,17 +300,19 @@ main(int argc, char *argv[])
 
     if (!read_conf && !read_conf_dir)
 	fatal(1,
-	      "could not open %s or any configuration files in %s (check that file permissions are 600)",
+	      "could not open %s or any configuration files in %s"
+	      "(check that file permissions are 600)",
 	      OP_ACCESS, OP_ACCESS_DIR);
 
     if ((pw = getpwuid(getuid())) == NULL)
-	exit(1);
+	exit(EXIT_FAILURE);
     realuser = (char *)strdup(pw->pw_name);
-    strncpy(user, pw->pw_name, MAXSTRLEN);
+    /* Flawfinder: fix (strncpy) */
+    strlcpy(user, pw->pw_name, MAXSTRLEN);
 
     if (lflag) {
 	ListCommands();
-	return 0;
+	exit(EXIT_SUCCESS);
     }
 
     if (hflag) {
@@ -314,7 +335,9 @@ main(int argc, char *argv[])
 	uptr = argv[argStart];
     else {
 	uptr++;
+	/* Flawfinder: ignore (race condition) */
 	if (access(argv[argStart], F_OK) != 0)
+	    /* Flawfinder: ignore (race condition) */
 	    if (access(argv[argStart], X_OK) != 0)
 		fatal(1, "unknown or non executable command");
     }
@@ -337,7 +360,9 @@ main(int argc, char *argv[])
     if (num < 0)
 	num = -num;
 
-    pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN);
+    /* XXX cppcheck unreadVariable:Variable 'pcmd_s' is assigned
+     *     a value that is never used */
+    /* pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN); */
     if (Verify(new, num, argc, argv) < 0)
 	fatal(0, "%s: permission denied by op", cmd->name);
 
@@ -358,9 +383,10 @@ Find(char *name)
 }
 
 char *
-FindOpt(cmd_t *cmd, char *str)
+FindOpt(cmd_t * cmd, char *str)
 {
-    static char nul[2] = "";
+    /* Flawfinder: ignore (char) */
+    static char nul[1] = "";
     int i;
     char *cp;
 
@@ -407,8 +433,14 @@ GetField(char *cp, char *str, int len)
 }
 
 #ifdef USE_PAM
+#if defined(__hpux) || defined(SOLARIS) || defined(_AIX)
+#define noconst
+#else
+#define noconst const
+#endif
+/* ARGUSED3 */
 int
-pam_conversation(int num_msg, const struct pam_message **msg,
+pam_conversation(int num_msg, noconst struct pam_message **msg,
 		 struct pam_response **response, void *appdata_ptr)
 {
     int i;
@@ -416,6 +448,7 @@ pam_conversation(int num_msg, const struct pam_message **msg,
     struct pam_response *pr;
     char *pass;
 
+    UNUSED(appdata_ptr);
     if ((*response = malloc(sizeof(struct pam_response) * num_msg)) == NULL)
 	return PAM_CONV_ERR;
     memset(*response, 0, num_msg * sizeof(struct pam_response));
@@ -430,9 +463,11 @@ pam_conversation(int num_msg, const struct pam_message **msg,
 	    pr->resp = pass;
 	    break;
 	case PAM_PROMPT_ECHO_OFF:
+	    /* Flawfinder: ignore (getpass) */
 	    if ((pass = getpass(pm->msg)) == NULL) {
 		for (pr = *response, i = 0; i < num_msg; ++i, ++pr)
 		    if (pr->resp) {
+			/* Flawfinder: ignore (strlen) */
 			memset(pr->resp, 0, strlen(pr->resp));
 			free(pr->resp);
 			pr->resp = NULL;
@@ -457,6 +492,7 @@ pam_conversation(int num_msg, const struct pam_message **msg,
 	default:
 	    for (pr = *response, i = 0; i < num_msg; ++i, ++pr)
 		if (pr->resp) {
+		    /* Flawfinder: ignore (strlen) */
 		    memset(pr->resp, 0, strlen(pr->resp));
 		    free(pr->resp);
 		    pr->resp = NULL;
@@ -478,6 +514,7 @@ VerifyPermissions(cmd_t * cmd)
 {
     int gr_fail = 1, uid_fail = 1, netgr_fail = 1;
     int i;
+    /* Flawfinder: ignore (char) */
     char *cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
     regexp *reg1 = NULL;
     struct passwd *pw;
@@ -494,21 +531,24 @@ VerifyPermissions(cmd_t * cmd)
 	return logger(LOG_ERR, "Could not get uid of current effective uid");
 
     if ((cp = FindOpt(cmd, "groups")) != NULL) {
+	/* Flawfinder: ignore (char) */
 	char grouphost[MAXSTRLEN + HOST_NAME_MAX], regstr[MAXSTRLEN];
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
-	    strcpy(regstr, "^(");
-	    strcat(regstr, str);
-	    strcat(regstr, ")$");
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(regstr, "^(", sizeof(regstr));
+	    strlcat(regstr, str, sizeof(regstr));
+	    strlcat(regstr, ")$", sizeof(regstr));
 
 	    if ((reg1 = regcomp(regstr)) == NULL)
 		return logger(LOG_ERR, "Invalid regex '%s'", regstr);
 
 	    if ((gr = getgrgid(pw->pw_gid)) != NULL) {
-		strcpy(grouphost, gr->gr_name);
-		strcat(grouphost, "@");
-		strcat(grouphost, hostname);
+		/* Flawfinder: fix (strcpy, strcat) */
+		strlcpy(grouphost, gr->gr_name, sizeof(grouphost));
+		strlcat(grouphost, "@", sizeof(grouphost));
+		strlcat(grouphost, hostname, sizeof(grouphost));
 
 		if (regexec(reg1, gr->gr_name) == 1 || regexec(reg1, grouphost)) {
 		    gr_fail = 0;
@@ -518,17 +558,16 @@ VerifyPermissions(cmd_t * cmd)
 
 	    setgrent();
 	    while ((gr = getgrent()) != NULL) {
-		i = 0;
-		while (gr->gr_mem[i] != NULL) {
+		/* while -> for */
+		for (i = 0; gr->gr_mem[i] != NULL; i++)
 		    if (strcmp(gr->gr_mem[i], pw->pw_name) == 0)
 			break;
-		    i++;
-		}
 
 		if (gr->gr_mem[i] != NULL) {
-		    strcpy(grouphost, gr->gr_name);
-		    strcat(grouphost, "@");
-		    strcat(grouphost, hostname);
+		    /* Flawfinder: fix (strcpy, strcat) */
+		    strlcpy(grouphost, gr->gr_name, sizeof(grouphost));
+		    strlcat(grouphost, "@", sizeof(grouphost));
+		    strlcat(grouphost, hostname, sizeof(grouphost));
 		    if (regexec(reg1, gr->gr_name) == 1
 			|| regexec(reg1, grouphost)) {
 			gr_fail = 0;
@@ -544,6 +583,7 @@ VerifyPermissions(cmd_t * cmd)
     }
 
     if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
+	/* Flawfinder: ignore (char) */
 	char currenttime[13], userhost[MAXSTRLEN + HOST_NAME_MAX],
 	    regstr[MAXSTRLEN];
 	time_t now = time(NULL);
@@ -552,18 +592,21 @@ VerifyPermissions(cmd_t * cmd)
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
+	    /* Flawfinder: ignore (char) */
 	    char expiretime[13], *expirestart = strchr(str, '/');
 
 	    if (expirestart)
 		*expirestart = 0;
 
-	    strcpy(regstr, "^(");
-	    strcat(regstr, str);
-	    strcat(regstr, ")$");
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(regstr, "^(", sizeof(regstr));
+	    strlcat(regstr, str, sizeof(regstr));
+	    strlcat(regstr, ")$", sizeof(regstr));
 
-	    strcpy(userhost, pw->pw_name);
-	    strcat(userhost, "@");
-	    strcat(userhost, hostname);
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(userhost, pw->pw_name, sizeof(userhost));
+	    strlcat(userhost, "@", sizeof(userhost));
+	    strlcat(userhost, hostname, sizeof(userhost));
 
 	    if ((reg1 = regcomp(regstr)) == NULL)
 		return logger(LOG_ERR, "Invalid regex '%s'", regstr);
@@ -571,8 +614,6 @@ VerifyPermissions(cmd_t * cmd)
 	    if (regexec(reg1, pw->pw_name) == 1 || regexec(reg1, userhost) == 1) {
 		/* valid user, check expiry (if any) */
 		if (expirestart) {
-		    int i;
-
 		    ++expirestart;
 
 		    /* ensure at least some sanity in the expiry time */
@@ -581,14 +622,16 @@ VerifyPermissions(cmd_t * cmd)
 			    return logger(LOG_ERR,
 					  "Expiry value (%s) has too many digits",
 					  expirestart);
-			if (!isdigit(expirestart[i]))
+			if (!isdigit((int)expirestart[i]))
 			    return logger(LOG_ERR,
 					  "Expiry value (%s) has non-numeric characters",
 					  expirestart);
 		    }
 
-		    strcpy(expiretime, "000000000000");	/* YYYYMMDD[HHmm] */
-		    strncpy(expiretime, expirestart, strlen(expirestart));
+		    /* Flawfinder: fix (strcpy, strncpy -> strlcpy, strlcat) */
+		    strlcpy(expiretime, expirestart, sizeof(expiretime));
+		    /* YYYYMMDD[HHmm] */
+		    strlcat(expiretime, "000000000000", sizeof(expiretime));
 
 		    if (strcmp(currenttime, expiretime) >= 0)
 			return logger(LOG_ERR, "Access expired at %s",
@@ -621,9 +664,10 @@ VerifyPermissions(cmd_t * cmd)
 }
 
 int
-Verify(cmd_t *cmd, int num, int argc, char **argv)
+Verify(cmd_t * cmd, int num, int argc, char **argv)
 {
     int i, j, val;
+    /* Flawfinder: ignore (char) */
     char *np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
     regexp *reg1 = NULL;
     regexp *reg2 = NULL;
@@ -637,8 +681,6 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 #endif
 #ifdef SECURID
     struct SD_CLIENT sd_dat, *sd;
-    int k;
-    char input[64], *p;
 #endif
 
     if ((pw = getpwuid(getuid())) == NULL)
@@ -665,9 +707,11 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
     if (getuid() != 0 && (cp = FindOpt(cmd, "password")) != NULL) {
 #ifdef USE_PAM
 	if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+	    /* Flawfinder: ignore (getpass) */
 	    if ((np = getpass("Password:")) == NULL)
 		return logger(LOG_ERR, "Could not get user password");
 
+	    /* Flawfinder: ignore (crypt) */
 	    if (strcmp(crypt(np, str), str) != 0)
 		return logger(LOG_ERR, "Incorrect direct password");
 	} else {
@@ -685,10 +729,12 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 	    pam_end(pam, resp);
 	}
 #else
+	/* Flawfinder: ignore (getpass) */
 	if ((np = getpass("Password:")) == NULL)
 	    return logger(LOG_ERR, "Could not get user password");
 
 	if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
+	    /* Flawfinder: ignore (crypt) */
 	    if (strcmp(crypt(np, str), str) != 0)
 		return logger(LOG_ERR, "Incorrect direct password");
 	} else {
@@ -701,13 +747,14 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 	    }
 #endif
 
+	    /* Flawfinder: ignore (crypt) */
 	    if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
 		return logger(LOG_ERR, "Invalid user password");
 	}
 #endif
     }
 
-    if ((i = VerifyPermissions(cmd) < 0))
+    if (VerifyPermissions(cmd) < 0)
 	return logger(LOG_ERR,
 		      "Both user, group and netgroup authentication failed");
 
@@ -717,7 +764,7 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 	    continue;
 	if (cmd->opts[i][1] != '*') {
 	    for (np = cmd->opts[i] + 1; np != cp; np++)
-		if (!isdigit(*np))
+		if (!isdigit((int)*np))
 		    break;
 	    if (np != cp)
 		continue;
@@ -729,11 +776,13 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 		cp = np;
 		for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 		     cp = GetField(cp, str, MAXSTRLEN - 5)) {
+		    /* Flawfinder: ignore (char) */
 		    char regstr[MAXSTRLEN];
 
-		    strcpy(regstr, "^(");
-		    strcat(regstr, str);
-		    strcat(regstr, ")$");
+		    /* Flawfinder: fix (strcpy, strcat) */
+		    strlcpy(regstr, "^(", sizeof(regstr));
+		    strlcat(regstr, str, sizeof(regstr));
+		    strlcat(regstr, ")$", sizeof(regstr));
 
 		    if ((reg1 = regcomp(regstr)) == NULL)
 			return logger(LOG_ERR, "Invalid regex '%s'", regstr);
@@ -751,13 +800,15 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 	    reg1 = NULL;
 	}
 
-	strncpy(str, cmd->opts[i] + 1, cp - cmd->opts[i] - 1);
-	str[cp - cmd->opts[i] - 1] = '\0';
+	/* Flawfinder: fix (strncpy) */
+	strlcpy(str, cmd->opts[i] + 1,
+		MIN((size_t) (cp - cmd->opts[i]), sizeof(str)));
 
-	if (!isdigit(*str))
+	if (!isdigit((int)*str))
 	    continue;
 
-	val = atoi(str);
+	/* Flawfinder: fix (atoi -> strtolong) */
+	val = strtolong(str, 10);
 
 	if (val >= argc)
 	    continue;
@@ -782,11 +833,13 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
 	    cp = np;
 	    for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 		 cp = GetField(cp, str, MAXSTRLEN - 5)) {
+		/* Flawfinder: ignore (char) */
 		char regstr[MAXSTRLEN];
 
-		strcpy(regstr, "^(");
-		strcat(regstr, str);
-		strcat(regstr, ")$");
+		/* Flawfinder: fix (strcpy, strcat) */
+		strlcpy(regstr, "^(", sizeof(regstr));
+		strlcat(regstr, str, sizeof(regstr));
+		strlcat(regstr, ")$", sizeof(regstr));
 
 		if ((reg2 = regcomp(regstr)) == NULL)
 		    return logger(LOG_ERR, "Invalid regex '%s'", regstr);
@@ -805,25 +858,27 @@ Verify(cmd_t *cmd, int num, int argc, char **argv)
     return 0;
 }
 
-/*
-*/
 char *
 str_replace(const char *source, int offset, int length, const char *paste)
 {
-    char *buffer = malloc(strlen(source) - length + strlen(paste) + 1);
+    /* Flawfinder: ignore (strlen) */
+    int len = strlen(source) - length + strlen(paste) + 1;
+    char *buffer = malloc(len);
 
     if (!buffer)
 	fatal(1, "Can't allocate buffer");
 
-    strncpy(buffer, source, offset);
-    buffer[offset] = 0;
-    strcat(buffer, paste);
-    strcat(buffer, source + offset + length);
+    /* Flawfinder: fix (strcpy, strcat) */
+    strlcpy(buffer, source, len);
+    if (offset <= len)
+	buffer[offset] = 0;	/* expected-warning */
+    strlcat(buffer, paste, len);
+    strlcat(buffer, source + offset + length, len);
     return buffer;
 }
 
 int
-Go(cmd_t *cmd, int num, int argc, char **argv)
+Go(cmd_t * cmd, int num, int argc, char **argv)
 {
     extern char **environ;
     int i, j, flag, val, len = 0;
@@ -833,14 +888,20 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
     int ngroups = 0;
     gid_t gidset[NGROUPS_MAX];
     int curenv = 0, curarg = 0;
+    /* Flawfinder: ignore (char) */
     char *new_envp[MAXENV];
+    /* Flawfinder: ignore (char) */
     char *new_argv[MAXARG];
+    /* Flawfinder: ignore (char) */
     char str[MAXSTRLEN];
     struct stat st;
 
+    UNUSED(num);
 #ifdef XAUTH
+    /* Flawfinder: ignore (getenv) */
     if (getenv("DISPLAY") != NULL && (cp = FindOpt(cmd, "xauth")) != NULL) {
 	struct passwd *currentpw;
+	/* Flawfinder: ignore (char) */
 	char tmpxauth[MAXSTRLEN], xauth[MAXSTRLEN], cxauth[MAXSTRLEN], *display;
 	int status;
 	uid_t uid;
@@ -852,29 +913,39 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 		fatal(1, "Can't get password entry for UID 0");
 	} else {
 	    if ((pw = getpwnam(cp)) == NULL)
-		if ((pw = getpwuid(atoi(cp))) == NULL)
+		/* Flawfinder: fix (atoi => strtolong) */
+		if ((pw = getpwuid((uid_t) strtolong(cp, 10))) == NULL)
 		    fatal(1, "Can't get password entry for %s", cp);
 	}
+	/* Flawfinder: ignore (getenv) */
 	if ((display = strchr(getenv("DISPLAY"), ':')) == NULL)
 	    fatal(1, "Could not extract X server from $DISPLAY '%s'",
+		  /* Flawfinder: ignore (getenv) */
 		  getenv("DISPLAY"));
-	strcpy(xauth, pw->pw_dir);
-	strcat(xauth, "/.Xauthority");
+	/* Flawfinder: fix (strcpy, strcat) */
+	strlcpy(xauth, pw->pw_dir, sizeof(xauth));
+	strlcat(xauth, "/.Xauthority", sizeof(xauth));
 	uid = pw->pw_uid;
 	gid = pw->pw_gid;
 	currentpw = getpwuid(getuid());
 	/* Now that we know the target user, we can copy the xauth cookies */
+	/* Flawfinder: ignore (getenv) */
 	if (getenv("XAUTHORITY") != NULL) {
-	    strcpy(cxauth, getenv("XAUTHORITY"));
+	    /* Flawfinder: fix (strcpy) */
+	    strlcpy(cxauth, getenv("XAUTHORITY"), sizeof(cxauth));
 	} else {
-	    strcpy(cxauth, currentpw->pw_dir);
-	    strcat(cxauth, "/.Xauthority");
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(cxauth, currentpw->pw_dir, sizeof(cxauth));
+	    strlcat(cxauth, "/.Xauthority", sizeof(cxauth));
 	}
 	/* Do not continue if the source .Xauthority does not exist */
 	if (stat(cxauth, &st) == 0) {
-	    strcpy(tmpxauth, "/var/tmp/op-xauth-XXXXXX");
+	    /* Flawfinder: fix (strcpy) */
+	    strlcpy(tmpxauth, "/var/tmp/op-xauth-XXXXXX", sizeof(tmpxauth));
+	    /* Flawfinder: ignore (mkstemp) */
 	    if (mkstemp(tmpxauth) == -1)
 		fatal(1, "mkstemp(%s) failed with %i", tmpxauth, errno);
+	    /* Flawfinder: ignore (race condition) */
 	    if (chown(tmpxauth, currentpw->pw_uid, currentpw->pw_gid) < 0) {
 		unlink(tmpxauth);
 		fatal(1, "Failed to change ownership of %s", tmpxauth);
@@ -886,9 +957,11 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 
 		/*      We need to be root to be sure that access to both Xauthority files
 		   will work */
+		/* Flawfinder: ignore (umask) */
 		umask(077);
 		setuid(currentpw->pw_uid);
 		setgid(currentpw->pw_gid);
+		/* Flawfinder: ignore (execv) */
 		if (execv(XAUTH, argv) == -1) {
 		    logger(LOG_ERR, "Unable to exec xauth, return code %i",
 			   errno);
@@ -912,13 +985,16 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 
 		/*      We need to be root to be sure that access to both Xauthority files
 		   will work */
+		/* Flawfinder: ignore (race condition) */
 		if (chown(tmpxauth, uid, gid) < 0) {
 		    unlink(tmpxauth);
 		    fatal(1, "Failed to change ownership of %s", tmpxauth);
 		}
+		/* Flawfinder: ignore (umask) */
 		umask(077);
 		setuid(uid);
 		setgid(gid);
+		/* Flawfinder: ignore (execv) */
 		if (execv(XAUTH, argv) == -1) {
 		    logger(LOG_ERR,
 			   "Unable to import X authorisation entry, return code %i",
@@ -935,18 +1011,23 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    if (status > 0)
 		fatal(1, "Unable to exec xauth, return code %i", status);
 	    /* Update $XAUTHORITY */
-	    new_envp[curenv] =
-		malloc(strlen("XAUTHORITY=") + strlen(xauth) + 1);
-	    strcpy(new_envp[curenv], "XAUTHORITY=");
-	    strcat(new_envp[curenv], xauth);
+	    /* Flawfinder: ignore (strlen) */
+	    len = strlen("XAUTHORITY=") + strlen(xauth) + 1;
+	    new_envp[curenv] = malloc(len);
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(new_envp[curenv], "XAUTHORITY=", len);
+	    strlcat(new_envp[curenv], xauth, len);
 	    if (curenv + 1 >= MAXENV)
 		fatal(1, "%s: environment length exceeded", cmd->name);
 	    ++curenv;
 	    /* Propagate $DISPLAY to new environment */
-	    new_envp[curenv] =
-		malloc(strlen("DISPLAY=") + strlen(getenv("DISPLAY")) + 1);
-	    strcpy(new_envp[curenv], "DISPLAY=");
-	    strcat(new_envp[curenv], getenv("DISPLAY"));
+	    /* Flawfinder: ignore (getenv) */
+	    len = strlen("DISPLAY=") + strlen(getenv("DISPLAY")) + 1;
+	    new_envp[curenv] = malloc(len);
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(new_envp[curenv], "DISPLAY=", len);
+	    /* Flawfinder: ignore (getenv) */
+	    strlcat(new_envp[curenv], getenv("DISPLAY"), len);
 	    if (curenv + 1 >= MAXENV)
 		fatal(1, "%s: environment length exceeded", cmd->name);
 	    ++curenv;
@@ -967,7 +1048,8 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    if ((gr = getgrnam(str)) != NULL)
 		gidset[ngroups++] = gr->gr_gid;
 	    else
-		gidset[ngroups++] = atoi(str);
+		/* Flawfinder: fix (atoi -> strtolong) */
+		gidset[ngroups++] = (gid_t) strtolong(str, 10);
 	}
 	if (i == NGROUPS_MAX)
 	    fatal(1, "Exceeded maximum number of groups");
@@ -984,7 +1066,8 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    fatal(1, "Unable to set uid to default");
     } else {
 	if ((pw = getpwnam(cp)) == NULL) {
-	    if (setuid(atoi(cp)) < 0)
+	    /* Flawfinder: fix (atoi -> strtolong) */
+	    if (setuid((uid_t) strtolong(cp, 10)) < 0)
 		fatal(1, "Unable to set uid to %s", cp);
 	} else {
 	    if (setuid(pw->pw_uid) < 0)
@@ -993,25 +1076,30 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
     }
 
     if ((cp = FindOpt(cmd, "umask")) == NULL) {
-	if (umask(0022) < 0) {
+	mode_t m = 0022;
+	/* Flawfinder: ignore (umask) */
+	if (!umask(m) || umask(m) != m) {
 	    fatal(1, "Unable to set umask to default");
 	}
     } else {
-	if (umask(atov(cp, 8)) < 0) {
+	mode_t m = (mode_t) strtolong(cp, 8);
+	/* Flawfinder: ignore (umask) */
+	if (!umask(m) || umask(m) != m) {
 	    fatal(1, "Unable to set umask to %s", cp);
 	}
     }
 
     if ((cp = FindOpt(cmd, "chroot")) == NULL) {
-	;			/* don't have a default */
+	/* don't have a default */
     } else {
+	/* Flawfinder: ignore (chroot) */
 	if (chroot(cp) < 0) {
 	    fatal(1, "Unable to chroot to %s", cp);
 	}
     }
 
     if ((cp = FindOpt(cmd, "dir")) == NULL) {
-	;			/* don't have a default */
+	/* don't have a default */
     } else {
 	if (chdir(cp) < 0) {
 	    fatal(1, "Unable to chdir to %s", cp);
@@ -1030,7 +1118,7 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    cp = cmd->opts[i] + 1;
 	    flag = 0;
 	    while ((*cp != '\0') && (*cp != '=')) {
-		if (!isdigit(*cp))
+		if (!isdigit((int)*cp))
 		    flag = 1;
 		cp++;
 	    }
@@ -1061,7 +1149,7 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	cp = cmd->opts[i] + 1;
 	flag = 0;
 	while ((*cp != '\0') && (*cp != '=')) {
-	    if (!isdigit(*cp))
+	    if (!isdigit((int)*cp))
 		flag = 1;
 	    cp++;
 	}
@@ -1087,6 +1175,7 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	struct group *grbuf;
 	struct stat statbuf;
 	char *ptr;
+	/* Flawfinder: ignore (char) */
 	char usergroup[MAXSTRLEN];
 
 	/* Get user and group name of the owner of the file */
@@ -1101,17 +1190,20 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    fatal(1, "%s: no identified group for gid %d", cmd->name,
 		  statbuf.st_gid);
 
+	/* Flawfinder: ignore (strlen) */
 	if (strlen(pwbuf->pw_name) + strlen(grbuf->gr_name) + 1 >= MAXSTRLEN)
 	    fatal(1, "%s: user/group string buffer length exceeded", cmd->name);
-	strcpy(usergroup, pwbuf->pw_name);
-	strcat(usergroup, ":");
-	strcat(usergroup, grbuf->gr_name);
+	/* Flawfinder: fix (strcpy, strcat) */
+	strlcpy(usergroup, pwbuf->pw_name, sizeof(usergroup));
+	strlcat(usergroup, ":", sizeof(usergroup));
+	strlcat(usergroup, grbuf->gr_name, sizeof(usergroup));
 
 	/* check users,groups candidates */
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
 	    regexp *reg1 = NULL;
+	    /* Flawfinder: ignore (char) */
 	    char regstr[MAXSTRLEN];
 
 	    ptr = strchr(str, ':');
@@ -1120,9 +1212,10 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 		      "%s: fowners argument must respect the user:group format",
 		      cmd->name);
 
-	    strcpy(regstr, "^(");
-	    strcat(regstr, str);
-	    strcat(regstr, ")$");
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(regstr, "^(", sizeof(regstr));
+	    strlcat(regstr, str, sizeof(regstr));
+	    strlcat(regstr, ")$", sizeof(regstr));
 
 	    if ((reg1 = regcomp(regstr)) == NULL)
 		return logger(LOG_ERR, "Invalid regex '%s'", str);
@@ -1144,19 +1237,23 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 
     if ((cp = FindOpt(cmd, "fperms")) != NULL) {
 	struct stat buf;
+	/* Flawfinder: ignore (char) */
 	char mode[5];
 
 	stat(cmd->args[0], &buf);
-	strnprintf(mode, 5, "%o", buf.st_mode & 07777);
+	/* NOLINTNEXTLINE (runtime/printf runtime/int) */
+	snprintf(mode, 5, "%lo", (unsigned long)buf.st_mode & 07777);
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
 	    regexp *reg1 = NULL;
+	    /* Flawfinder: ignore (char) */
 	    char regstr[MAXSTRLEN];
 
-	    strcpy(regstr, "^(");
-	    strcat(regstr, str);
-	    strcat(regstr, ")$");
+	    /* Flawfinder: fix (strcpy, strcat) */
+	    strlcpy(regstr, "^(", sizeof(regstr));
+	    strlcat(regstr, str, sizeof(regstr));
+	    strlcat(regstr, ")$", sizeof(regstr));
 
 	    if ((reg1 = regcomp(regstr)) == NULL)
 		return logger(LOG_ERR, "Invalid regex '%s'", str);
@@ -1187,18 +1284,21 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 		fatal(1, "%s: argument length exceeded", cmd->name);
 	    new_argv[curarg++] = "-c";
 
+	    len = 0;
 	    for (i = 1; i < argc; i++)
+		/* Flawfinder: ignore (strlen) */
 		len += strlen(argv[i]) + 1;
 
-	    if ((cp = (char *)malloc(len + 10)) == NULL)
+	    len += 10;
+	    if ((cp = (char *)malloc(len)) == NULL)
 		fatal(1, "%s: unable to create buffer", cmd->name);
 
-	    len = 0;
 	    *cp = '\0';
 
 	    for (i = 1; i < argc; i++) {
-		strcat(cp, argv[i]);
-		strcat(cp, " ");
+		/* Flawfinder: fix (strcat) */
+		strlcat(cp, argv[i], len);
+		strlcat(cp, " ", len);
 	    }
 	    if (curarg >= MAXARG - 1)
 		fatal(1, "%s: argument length exceeded", cmd->name);
@@ -1211,14 +1311,16 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 	    np = cmd->args[i];
 
 	    /* Complete argument is a variable expansion. */
+	    /* Flawfinder: ignore (strlen) */
 	    if (strlen(np) == 2 && np[0] == '$') {
 		if (np[1] == '*') {
 		    if (curarg + argc >= MAXARG - 1)
 			fatal(1, "%s: argument length exceeded", cmd->name);
 		    for (j = consumed_args; j < argc; j++)
 			new_argv[curarg++] = argv[j];
-		} else if (isdigit(np[1])) {
-		    int argi = atoi(np + 1);
+		} else if (isdigit((int)np[1])) {
+		    /* Flawfinder: fix (atoi -> strtolong) */
+		    size_t argi = strtolong(np + 1, 10);
 
 		    if (argi > argc)
 			fatal(1, "%s Referenced argument out of range",
@@ -1242,12 +1344,12 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 			++cp;
 
 			if (*cp == '*') {
-			    int len = 1;
 			    char *buffer;
 
 			    ++cp;
 			    /* Find total length of all arguments */
-			    for (j = 1; j < argc; j++)
+			    for (len = j = 1; j < argc; j++)
+				/* Flawfinder: ignore (strlen) */
 				len += strlen(argv[j]) + 1;
 
 			    if ((buffer = malloc(len)) == NULL)
@@ -1257,9 +1359,10 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 
 			    /* Expand all arguments */
 			    for (j = 1; j < argc; j++) {
-				strcat(buffer, argv[j]);
+				/* Flawfinder: fix (strcat) */
+				strlcat(buffer, argv[j], len);
 				if (j < argc - 1)
-				    strcat(buffer, " ");
+				    strlcat(buffer, " ", len);
 			    }
 			    tmp = str_replace(cmd->args[i],
 					      np - cmd->args[i] - 1,
@@ -1268,11 +1371,12 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 			    np = cp;
 			    cmd->args[i] = tmp;
 			} else {
-			    while (isdigit(*cp))
+			    while (isdigit((int)*cp))
 				++cp;
 
 			    if (cp != np) {
-				val = atoi(np);
+				/* Flawfinder: fix (atoi -> strtolong) */
+				val = strtolong(np, 10);
 
 				tmp = str_replace(cmd->args[i],
 						  np - cmd->args[i] - 1,
@@ -1311,7 +1415,7 @@ Go(cmd_t *cmd, int num, int argc, char **argv)
 }
 
 void
-output(cmd_t *cmd)
+output(cmd_t * cmd)
 {
     int i;
 
@@ -1333,16 +1437,19 @@ format_cmd(int argc, char **argv, char *retbuf, int buflen)
      too long, return an error message.
 */
 {
-    int i, l = 0, s, ss, m = 0;
+    int i, l = 0, s, m = 0;
     char *buf = 0;
 
+    UNUSED(buflen);
+    /* Flawfinder: ignore (strlen) */
     s = strlen(argv[0]);
     if ((s > MAXSTRLEN)) {
-	retbuf = strcpy(retbuf, "unknown cmd (name too long in format_cmd)");
+	/* Flawfinder: fix (strcpy) */
+	strlcpy(retbuf, "unknown cmd (name too long in format_cmd)", MAXSTRLEN);
 	return retbuf;
     }
-    ss = s;
     for (i = 1; i < argc; i++) {
+	/* Flawfinder: ignore (strlen) */
 	l = strlen(argv[i]);
 	m = l > m ? l : m;
 	s += l;
@@ -1350,18 +1457,19 @@ format_cmd(int argc, char **argv, char *retbuf, int buflen)
     if (l)
 	s += argc - 1;		/* count spaces if there are arguments */
     if (s > MAXSTRLEN) {	/* Ooops, we've gone over. */
-	s = ss;			/* Just print command name */
 	m = 0;
 	argc = 0;
     }
-/*	sprintf(retbuf,"%s",argv[0]);*/
-    strcpy(retbuf, "");
+    *retbuf = '\0';
     if (m)
-	buf = (char *)malloc(m + 2);
+	/* Flawfinder: fix (m += 2) */
+	buf = (char *)malloc(m += 2);
     if (buf) {
 	for (i = 1; i < argc; i++) {
-	    sprintf(buf, " %s", argv[i]);
-	    strcat(retbuf, buf);
+	    /* Flawfinder: fix (sprintf) */
+	    snprintf(buf, m, " %s", argv[i]);
+	    /* Flawfinder: fix (strcat) */
+	    strlcat(retbuf, buf, MAXSTRLEN);
 	}
 	free(buf);
     }
@@ -1371,6 +1479,7 @@ format_cmd(int argc, char **argv, char *retbuf, int buflen)
 int
 vlogger(unsigned level, const char *format, va_list args)
 {
+    /* Flawfinder: ignore (char) */
     char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
     char *username = "unknown";
 
@@ -1380,12 +1489,13 @@ vlogger(unsigned level, const char *format, va_list args)
     if (realuser)
 	username = realuser;
 
-    vstrnprintf(buffer2, MAXSTRLEN, format, args);
+    /* Flawfinder: ignore (vsnprintf) */
+    vsnprintf(buffer2, MAXSTRLEN, format, args);
     if (level & LOG_PRINT)
 	printf("%s\n", buffer2);
     level &= ~LOG_PRINT;
-    strnprintf(buffer, MAXSTRLEN, "%s%s: %s", username,
-	       format_cmd(gargc, gargv, buffer3, MAXSTRLEN), buffer2);
+    snprintf(buffer, MAXSTRLEN, "%s%s: %s", username,
+	     format_cmd(gargc, gargv, buffer3, MAXSTRLEN), buffer2);
     syslog(level, "%s", buffer);
     return -1;
 }
@@ -1404,11 +1514,13 @@ logger(unsigned level, const char *format, ...)
 void
 fatal(int logit, const char *format, ...)
 {
+    /* Flawfinder: ignore (char) */
     char buffer[MAXSTRLEN];
     va_list ap;
 
     va_start(ap, format);
-    vstrnprintf(buffer, MAXSTRLEN, format, ap);
+    /* Flawfinder: ignore (vsnprintf) */
+    vsnprintf(buffer, MAXSTRLEN, format, ap);
     fprintf(stderr, "%s\n", buffer);
     if (logit)
 	logger(LOG_ERR, "%s", buffer);

@@ -65,6 +65,26 @@ char *strchr(), *strrchr();
 # endif
 #endif
 
+#if HAVE_LIBBSD
+#include <bsd/string.h>
+#else
+# if !HAVE_STRLCAT
+size_t strlcat(char *dst, const char *src, size_t siz);
+size_t strlcpy(char *dst, const char *src, size_t siz);
+# endif
+#endif
+
+#if !HAVE_VSNPRINTF
+int snprintf(char *str, size_t size, const char *format, ...);
+int vsnprintf(char *str, size_t size, const char *format, va_list arg);
+#endif
+
+#ifndef MIN
+#define MIN(a, b)	((a) < (b) ? (a) : (b))
+#endif
+
+#define UNUSED(x) (void)(x)
+
 #ifdef malloc
 void *rpl_malloc(size_t n);
 #endif
@@ -105,9 +125,8 @@ extern unsigned minimum_logging_level;
 
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
-void strnprintf(char *out, int len, const char *format, ...);
-void vstrnprintf(char *out, int len, const char *format, va_list ap);
 char *strtolower(char *in);
+long strtolong(char *str, int base);
 
 int ReadFile(char *file);
 int ReadDir(char *dir);
