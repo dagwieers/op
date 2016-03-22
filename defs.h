@@ -58,43 +58,50 @@
 #  define strchr index
 #  define strrchr rindex
 # endif
-char *strchr (), *strrchr ();
+char *strchr(), *strrchr();
 # if !HAVE_MEMCPY
 #  define memcpy(d, s, n) bcopy ((s), (d), (n))
 #  define memmove(d, s, n) bcopy ((s), (d), (n))
 # endif
 #endif
 
+#ifdef malloc
+void *rpl_malloc(size_t n);
+#endif
+#ifdef realloc
+void *rpl_realloc(void *ptr, size_t n);
+#endif
+
 typedef struct cmd_s {
-	char		*name;
-	int		nargs, nopts;
-	int		margs, mopts;
-	char		**args, **opts;
-	struct cmd_s	*next;
+    char *name;
+    int nargs, nopts;
+    int margs, mopts;
+    char **args, **opts;
+    struct cmd_s *next;
 } cmd_t;
 
 typedef struct var_s {
-	char *name, *value;
-	struct var_s *next;
+    char *name, *value;
+    struct var_s *next;
 } var_t;
 
 typedef struct array_s {
-	void **data;
-	int size, capacity;
+    void **data;
+    int size, capacity;
 } array_t;
 
 /* functions to manage a dynamically extensible array of pointers */
 #define ARRAY_CHUNK	32
 array_t *array_alloc();
-void array_free(array_t *array);
-array_t *array_free_contents(array_t *array);
-void *array_push(array_t *array, void *object);
-void *array_pop(array_t *array);
-int array_extend(array_t *array, int capacity);
+void array_free(array_t * array);
+array_t *array_free_contents(array_t * array);
+void *array_push(array_t * array, void *object);
+void *array_pop(array_t * array);
+int array_extend(array_t * array, int capacity);
 
-extern cmd_t	*First, *Build(), *BuildSingle();
-extern var_t	*Variables;
-extern unsigned	minimum_logging_level;
+extern cmd_t *First, *Build(), *BuildSingle();
+extern var_t *Variables;
+extern unsigned minimum_logging_level;
 
 void fatal(int logit, const char *format, ...);
 int logger(unsigned flags, const char *format, ...);
@@ -104,15 +111,18 @@ char *strtolower(char *in);
 
 int ReadFile(char *file);
 int ReadDir(char *dir);
-int CountArgs(cmd_t *cmd);
+int CountArgs(cmd_t * cmd);
 int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
+#ifndef SYSCONFDIR
+#define SYSCONFDIR	"/etc"
+#endif
 #define OP_ACCESS	SYSCONFDIR "/op.conf"
 #define OP_ACCESS_DIR	SYSCONFDIR "/op.d"
 
 #define VAR_EXPAND_LEN	8192
-#define	VAR_NAME_LEN	64	
+#define	VAR_NAME_LEN	64
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX	255
