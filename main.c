@@ -67,14 +67,14 @@ extern char *savestr();
 /* Flawfinder: ignore */
 extern char *getpass(), *crypt();
 
-char *format_cmd(int argc, char **argv, char *retbuf, /* UNUSED */ int buflen);
+char *format_cmd(int argc, char **argv, char *retbuf, /* UNUSED */ size_t buflen);
 char *GetCode();
-int Verify(cmd_t * cmd, int num, int argc, char **argv);
+int Verify(cmd_t * cmd, size_t num, int argc, char **argv);
 int VerifyPermissions(cmd_t * cmd);
 cmd_t *Find(char *name);
 char *FindOpt(cmd_t * cmd, char *str);
 void ListCommands();
-int Go(cmd_t * cmd, /* UNUSED */ int num, int argc, char **argv);
+int Go(cmd_t * cmd, /* UNUSED */ size_t num, int argc, char **argv);
 cmd_t *First = NULL;
 var_t *Variables = NULL;
 char *realuser = NULL;
@@ -108,7 +108,7 @@ ListCommands()
 {
     cmd_t *def, *cmd;
     array_t *cmds = array_alloc();
-    int length = 0, i;
+    size_t length = 0, i;
 
     def = Find("DEFAULT");
     /*      first pass, get maximum command length and number of commands we have
@@ -119,7 +119,7 @@ ListCommands()
 
 	    if (VerifyPermissions(new) >= 0) {
 		/* Flawfinder: ignore (strlen) */
-		int l = strlen(new->name);
+		size_t l = strlen(new->name);
 
 		for (i = 0; i < cmds->size; ++i)
 		    if (!strcmp(((cmd_t *) cmds->data[i])->name, new->name))
@@ -146,7 +146,7 @@ ListCommands()
 		char *help = FindOpt(new, "help");
 
 		if (!help || !*help) {
-		    int j, len = 0;
+		    size_t j, len = 0;
 
 		    for (j = 0; j < cmd->nargs; ++j)
 			/* Flawfinder: ignore (strlen) */
@@ -168,8 +168,8 @@ ListCommands()
 			    strlcat(help, cmd->args[j], len);
 		    }
 		}
-		printf("%-*s", length + 2, new->name);
-		printf("%-*.*s", 77 - length, 77 - length, help);
+		printf("%-*s", (int)length + 2, new->name);
+		printf("%-*.*s", 77 - (int)length, 77 - (int)length, help);
 		/* Flawfinder: ignore (strlen) */
 		if (strlen(help) > 77 - length)
 		    printf("...\n");
@@ -188,7 +188,8 @@ ReadDir(char *dir)
 
     if ((d = opendir(dir)) != NULL) {
 	struct dirent *f;
-	int i, successes = 0;
+	size_t i;
+	int successes = 0;
 	array_t *dir_list = array_alloc();
 
 	while ((f = readdir(d))) {
@@ -387,7 +388,7 @@ FindOpt(cmd_t * cmd, char *str)
 {
     /* Flawfinder: ignore (char) */
     static char nul[1] = "";
-    int i;
+    size_t i;
     char *cp;
 
     for (i = 0; i < cmd->nopts; i++) {
@@ -395,7 +396,7 @@ FindOpt(cmd_t * cmd, char *str)
 	    if (strcmp(cmd->opts[i], str) == 0)
 		return nul;
 	} else {
-	    int l = cp - cmd->opts[i];
+	    size_t l = cp - cmd->opts[i];
 	    if (strncmp(cmd->opts[i], str, l) == 0)
 		return cp + 1;
 	}
@@ -405,7 +406,7 @@ FindOpt(cmd_t * cmd, char *str)
 }
 
 char *
-GetField(char *cp, char *str, int len)
+GetField(char *cp, char *str, size_t len)
 {
     char *end = str + len - 2;
 
@@ -443,7 +444,7 @@ int
 pam_conversation(int num_msg, noconst struct pam_message **msg,
 		 struct pam_response **response, void *appdata_ptr)
 {
-    int i;
+    size_t i;
     const struct pam_message *pm;
     struct pam_response *pr;
     char *pass;
@@ -513,7 +514,7 @@ int
 VerifyPermissions(cmd_t * cmd)
 {
     int gr_fail = 1, uid_fail = 1, netgr_fail = 1;
-    int i;
+    size_t i;
     /* Flawfinder: ignore (char) */
     char *cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
     regexp *reg1 = NULL;
@@ -668,9 +669,11 @@ VerifyPermissions(cmd_t * cmd)
 }
 
 int
-Verify(cmd_t * cmd, int num, int argc, char **argv)
+Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 {
-    int i, j, val;
+    size_t i, j;
+    /* NOLINTNEXTLINE(runtime/int) */
+    long val;
     /* Flawfinder: ignore (char) */
     char *np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
     regexp *reg1 = NULL;
@@ -758,6 +761,10 @@ Verify(cmd_t * cmd, int num, int argc, char **argv)
 #endif
     }
 
+    /* XXX cppcheck clarifyCondition:
+     *     Suspicious condition (assignment + comparison);
+     *     Clarify expression with parentheses
+     */
     if (VerifyPermissions(cmd) < 0)
 	return logger(LOG_ERR,
 		      "Both user, group and netgroup authentication failed");
@@ -863,10 +870,10 @@ Verify(cmd_t * cmd, int num, int argc, char **argv)
 }
 
 char *
-str_replace(const char *source, int offset, int length, const char *paste)
+str_replace(const char *source, size_t offset, size_t length, const char *paste)
 {
     /* Flawfinder: ignore (strlen) */
-    int len = strlen(source) - length + strlen(paste) + 1;
+    size_t len = strlen(source) - length + strlen(paste) + 1;
     char *buffer = malloc(len);
 
     if (!buffer)
@@ -882,11 +889,14 @@ str_replace(const char *source, int offset, int length, const char *paste)
 }
 
 int
-Go(cmd_t * cmd, int num, int argc, char **argv)
+Go(cmd_t * cmd, size_t num, int argc, char **argv)
 {
     extern char **environ;
     /* cppcheck-suppress variableScope */
-    int i, j, flag, val, len = 0;
+    size_t i, j, len;
+    int flag;
+    /* NOLINTNEXTLINE(runtime/int) */
+    long val;
     /* cppcheck-suppress variableScope */
     char *cp, *np;
     struct passwd *pw;
@@ -894,7 +904,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
     /* cppcheck-suppress variableScope */
     int ngroups = 0;
     gid_t gidset[NGROUPS_MAX];
-    int curenv = 0, curarg = 0;
+    size_t curenv = 0, curarg = 0;
     /* Flawfinder: ignore (char) */
     char *new_envp[MAXENV];
     /* Flawfinder: ignore (char) */
@@ -1251,7 +1261,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
 
 	stat(cmd->args[0], &buf);
 	/* NOLINTNEXTLINE (runtime/printf runtime/int) */
-	snprintf(mode, 5, "%lo", (unsigned long)buf.st_mode & 07777);
+	snprintf(mode, 5, "%lo", (unsigned long)(buf.st_mode & 07777));
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
@@ -1314,7 +1324,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
 	    new_argv[curarg++] = cp;
 	}
     } else {
-	int consumed_args = 1;
+	size_t consumed_args = 1;
 
 	for (i = 0; i < cmd->nargs; i++) {
 	    np = cmd->args[i];
@@ -1426,7 +1436,7 @@ Go(cmd_t * cmd, int num, int argc, char **argv)
 void
 output(cmd_t * cmd)
 {
-    int i;
+    size_t i;
 
     printf("cmd '%s'\n", cmd->name);
     printf("\n  args\t");
@@ -1439,14 +1449,14 @@ output(cmd_t * cmd)
 }
 
 char *
-format_cmd(int argc, char **argv, char *retbuf, int buflen)
+format_cmd(int argc, char **argv, char *retbuf, size_t buflen)
 /*   
      Format command and args for printing to syslog
      If length (command + args) is too long, try length(command). If THATS
      too long, return an error message.
 */
 {
-    int i, l = 0, s, m = 0;
+    size_t i, l = 0, s, m = 0;
     char *buf = 0;
 
     UNUSED(buflen);
