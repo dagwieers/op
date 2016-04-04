@@ -1,0 +1,12 @@
+i pkginfo
+i postinstall
+d none usr ? ? ?
+d none usr/local/bin ? ? ?
+d none usr/local/etc ? ? ?
+d none usr/local/share ? ? ?
+d none usr/local/share/man ? ? ?
+d none usr/local/share/man/man1 ? ? ?
+d none usr/local/etc/op.d 0700 root sys
+f none usr/local/bin/op=usr/local/bin/op 4511 root sys
+f none usr/local/etc/op.conf-dist=usr/local/etc/op.conf-dist 0600 root sys
+f none usr/local/share/man/man1/op.1=usr/local/share/man/man1/op.1 0444 root bin

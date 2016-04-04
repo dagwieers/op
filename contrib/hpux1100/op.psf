@@ -1,0 +1,51 @@
+# PSF file for /usr/contrib                               1/14/97
+#
+#
+# Useful Commands:
+#
+# swpackage -p -vv -s /depot/psf_files/op.psf -d /depot/s700_contrib
+# swmodify -p -d -vv -s /depot/psf_files/op.psf op @ /depot/s700_contrib
+# swremove -p -v -d op,r=yyy @ /depot/s700_contrib
+# swinstall -p -v -s /depot/s700_contrib op
+#
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# This section is optional -- delete it if you don't want it.
+#
+vendor
+        tag RATP
+        title "Linux operations at RATP"
+        #description ""
+end
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# Describe the product below.  Search and replace the op. Delete
+# what you don't use.  Either define filesets by file or by whole directory.
+#
+product
+        tag OP
+        title "Controlled privilege escalation (a flexible alternative to sudo)"
+        description "Controlled privilege escalation (a flexible alternative to sudo)"
+        revision 1.32
+        #
+        architecture S700/S800_HPUX_11
+        machine_type 9000/[78]*
+        os_name HP-UX
+        os_release ?.11.*
+        os_version *
+        #
+        fileset
+                tag op
+                title "op executables"
+                revision 1.32
+
+                file -u 0177 -g root -o root usr/local/etc/op.conf-dist /usr/local/etc/op.conf-dist
+                file -m 4755 -g bin -o root usr/local/bin/op /usr/local/bin/op
+		file -u 0333 -g bin -o bin usr/local/share/man/man1/op.1 /usr/local/share/man/man1/op.1
+                postinstall op.postinstall
+                postremove op.postremove
+        end
+end
+
