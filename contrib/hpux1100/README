@@ -1,0 +1,6 @@
+create a datastream package named op-0.2-HP-UX.depot
+# /usr/sbin/swpackage -sop.psf -dop-0.2-HP-UX.depot -xtarget_type=tape
+
+install it
+# swinstall -s `pwd`/op-0.2-HP-UX.depot \*
+

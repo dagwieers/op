@@ -1,0 +1,31 @@
+#!/sbin/sh
+
+set -e
+
+PATH=${SW_PATH}:/sbin:/usr/bin:/usr/ccs/sbin
+
+DESTDIR=${DESTDIR:-${SW_ROOT_DIRECTORY:-}}
+[ ${DESTDIR} = '/' ] && DESTDIR=
+LOCALDIR=/usr/local
+[ -n ${LOCALDIR} ] && USERDIR=${LOCALDIR} || USERDIR=/usr
+
+CFGOWN=root
+CFGGRP=root
+
+# /etc/op.conf
+test -f ${DESTDIR}${LOCALDIR}/etc/op.conf ||
+    cp ${DESTDIR}${LOCALDIR}/etc/op.conf-dist ${DESTDIR}${LOCALDIR}/etc/op.conf
+chown ${CFGOWN}:${CFGGRP} ${DESTDIR}${LOCALDIR}/etc/op.conf
+chmod 600 ${DESTDIR}${LOCALDIR}/etc/op.conf
+
+# /etc/op.d
+test -d ${DESTDIR}${LOCALDIR}/etc/op.d ||
+    mkdir ${DESTDIR}${LOCALDIR}/etc/op.d
+chown ${CFGOWN}:${CFGGRP} ${DESTDIR}${LOCALDIR}/etc/op.d
+chmod 700 ${DESTDIR}${LOCALDIR}/etc/op.d
+
+# /etc/op.d/*
+chown ${CFGOWN}:${CFGGRP} ${DESTDIR}${LOCALDIR}/etc/op.d/* || : set -e
+chmod 600 ${DESTDIR}${LOCALDIR}/etc/op.d/* || : set -e
+
+# eof

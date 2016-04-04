@@ -1,0 +1,19 @@
+home=$HOME
+rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
+osrel=$(uname -r | sed 's|B.||')
+osver=$(uname -r | tr -d B.)
+vers=1.32
+PATH=/usr/sbin:$PATH
+
+set -e
+cd $home/op
+mkdir -p build/hpux$osver
+cd $home/op/build/hpux$osver
+type lex > /dev/null 2>&1 || cp -p ../../lex.c .
+ln -fs ../../op.conf-dist .
+../../configure --enable-xauth=/usr/bin/X11/xauth
+make
+make install DESTDIR=$home/op/contrib/hpux$osver
+cd $home/op/contrib/hpux$osver
+swpackage -s op.psf -d op-$vers-HP-UX-$osrel.depot -x target_type=tape
+scp op-$vers-HP-UX-$osrel.depot $rdist

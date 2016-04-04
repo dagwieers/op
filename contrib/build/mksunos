@@ -1,0 +1,19 @@
+home=${HOME}
+rdist=exploit@recife:/home/ftp/diffusion/exploitation/op/
+vers=1.32
+PATH=/sbin:/usr/sbin:$PATH:/usr/openwin/bin
+
+set -e
+cd $home/op
+mkdir -p build/sunos59
+cd $home/op/sunos59
+../../configure --enable-xauth=/usr/openwin/bin/xauth
+make
+make install DESTDIR=$home/op/contrib/solaris
+rm $home/op/contrib/solaris/usr/local/etc/op.conf || :
+cd $home/op/contrib/solaris
+pkgmk -od $PWD
+pkgtrans $PWD RATPop-$vers.pkg RATPop
+pkginfo -ld RATPop-$vers.pkg
+pkgchk -vd RATPop-$vers.pkg all
+scp RATPop-$vers.pkg RATPop.admin $rdist

@@ -1,0 +1,10 @@
+PKG="RATPop"
+NAME="op"
+CATEGORY="application"
+ARCH="sparc"
+VERSION="1.32"
+BASEDIR=/
+VENDOR="not for sale"
+DESC="Controlled privilege escalation (a flexible alternative to sudo)"
+EMAIL=""
+HOTLINE="Please contact your local service provider"
