@@ -1,0 +1,41 @@
+this rootsh directory was made for creating a installp package
+using the lppbuild tool.  Get it from 
+ftp://aixpdslib.seas.ucla.edu/pub/lppbuild/RISC/4.3/src/lppbuild.2.1.tar.Z
+
+1. Set your PATH to <wherever you unpack it>/lppbuild-2.1/bin
+
+2. Change into the rootsh directory
+   copy  your rootsh binary to
+   ./rootsh/rootsh/root/usr/bin/COPY_YUR_ROOTSH_BINARY_HERE
+
+   chown bin:bin rootsh/root/usr
+   chmod 755     rootsh/root/usr
+   chown bin:bin rootsh/root/usr/bin
+   chmod 755     rootsh/root/usr/bin
+   chown bin:bin rootsh/root/usr/bin/rootsh
+   chmod 500     rootsh/root/usr/bin/rootsh
+
+3. Call lppbuild
+   hopefully you will see this
+   # lppbuild
+   LPPBUILD - Processing for rootsh started
+   found "rootsh" at level 0.2.0.0.
+   Processing files for rootsh...
+   Backing up to /home/qx28305/rootsh-0.2/contrib/aix/rootsh/rootsh.bff.
+   Cluster 51200 bytes (100 blocks).
+   Volume 1 on /home/qx28305/rootsh-0.2/contrib/aix/rootsh/rootsh.bff
+   a          102 ./lpp_name
+   a            0 ./usr
+   a            0 ./usr/bin
+   a        64585 ./usr/bin/rootsh
+   a            0 ./usr/lpp
+   a            0 ./usr/lpp/rootsh
+   a         3460 ./usr/lpp/rootsh/liblpp.a
+   The total size is 68147 bytes.
+   Backup finished on Thu Jul 15 15:42:42 MSZ 2004; there are 200 blocks on 1 volumes.
+   LPPBUILD - processing complete
+   # 
+
+4. lppbuild created a package rootsh.bff which you can install with 
+   installp -a -d .../rootsh.bff all
+

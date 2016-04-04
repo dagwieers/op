@@ -1,0 +1,14 @@
+#!/sbin/sh
+
+set -e
+
+PATH=${SW_PATH}:/sbin:/usr/bin:/usr/ccs/sbin
+
+DESTDIR=${DESTDIR:-}
+[ ${DESTDIR} = '/' ] && DESTDIR=
+LOCALDIR=/usr/local
+[ -n ${LOCALDIR} ] && USERDIR=${LOCALDIR} || USERDIR=/usr
+
+rm -f ${DESTDIR}${USERDIR}/bin/op ${DESTDIR}${USERDIR}/share/man/man1/op.1
+
+# eof
