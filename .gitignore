@@ -4,7 +4,9 @@
 .deps/
 Makefile
 \[config.h].in
+audit/
 autom4te.cache/
+build/
 config.h
 config.log
 config.status
