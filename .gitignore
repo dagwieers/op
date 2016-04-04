@@ -13,4 +13,5 @@ config.status
 lex.c
 op
 op.list
+packages/
 stamp-h1
