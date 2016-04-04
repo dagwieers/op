@@ -1,4 +1,5 @@
 home=$HOME
+serv=sv003611
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
 osrel=$(oslevel | cut -d . -f 1-2)
 vers=1.32
@@ -8,18 +9,20 @@ PATH=/usr/sbin:$PATH
 # set -e
 cd $home/op
 make distclean
-mkdir -p build/aix$dist
+mkdir -p build/aix$dist contrib/aix$dist/op/op/build packages
 cd $home/op/build/aix$dist
 for i in lex.l main.c regexp.c snprintf.c strlcat.c strlcpy.c util.c yywrap.c op.1 op.conf-dist
 do ln -fs ../../$i; done; cp -p ../../lex.c lex.c
 ../../configure --enable-xauth=/usr/bin/X11/xauth
 make
-sudo make install DESTDIR=$home/op/contrib/aix$dist/op/op
-sudo rm $home/op/contrib/aix$dist/op/op/usr/local/etc/op.conf
+sudo make install DESTDIR=$home/op/contrib/aix$dist/op/op/build
+sudo rm -f $home/op/contrib/aix$dist/op/op/build/usr/local/etc/op.conf
 cd $home/op/contrib/aix$dist/op/op
-# echo /usr/local/etc/op.conf preserve > root/.info/ratp.freeware.op.cfgfiles
+# echo /usr/local/etc/op.conf preserve > build/.info/ratp.freeware.op.cfgfiles
 sed "s|@PWD@|$PWD|" op.tmpl > op.template
-mkinstallp -d root -T op.template
-#sudo installp -Ld root/tmp/ratp.freeware.op.$vers.$osrel.bff
-#sudo installp -ld root/tmp/ratp.freeware.op.$vers.$osrel.bff
-scp root/tmp/ratp.freeware.op.$vers.$osrel.bff $rdist
+sudo mkinstallp -d build -T op.template
+#sudo installp -Ld build/tmp/ratp.freeware.op.$vers.$osrel.bff
+#sudo installp -ld build/tmp/ratp.freeware.op.$vers.$osrel.bff
+scp -p build/tmp/ratp.freeware.op.$vers.$osrel.bff $rdist
+cp -p build/tmp/ratp.freeware.op.$vers.$osrel.bff $home/op/packages/
+tar cf - -C $home op/packages/ratp.freeware.op.$vers.$osrel.bff | ssh $serv tar xf -

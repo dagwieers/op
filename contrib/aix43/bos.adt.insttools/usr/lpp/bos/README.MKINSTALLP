@@ -1,0 +1,271 @@
+mkinstallp README
+
+Description
+
+The mkinstallp command is a tool that allows users to create their own
+software packages for AIX. Packages created with mkinstallp are in installp
+format and can be installed or removed with the installp command.
+
+Files to be packaged by mkinstallp must be in a directory structure such
+that the location of the file relative to the root build directory is the
+same as the destination of the file after installation. For example, if
+/usr/bin/<somecommand> is to be installed via a mkinstallp package,
+the file <buildroot>/usr/bin/<somecommand> must exist when mkinstallp
+is invoked.
+
+Once the contents of a package are in the correct directory structure,
+mkinstallp prompts for basic package data via the command line interface.
+This data includes the package name, requisites, descriptions of files to
+be packaged, etc. mkinstallp will then generate a template file based on
+responses given by the user. Template files can be created and/or edited
+directly by the user and passed to the mkinstallp command with the -T flag
+to avoid command line prompting.  A subdirectory of the root build directory,
+<buildroot>/.info, will be created for mkinstallp to save the template file
+and other packaging and configuration files.
+
+Command Syntax
+
+mkinstallp [ -d BaseDirectory ] [ -T TemplateFile ]
+
+Flags
+
+-d BaseDirectory Specifies the root build directory containing the files
+to be packaged. If omitted, the current working directory is used.
+
+-T TemplateFile Specifies the full path name of the template file to be
+passed to mkinstallp. If omitted, mkinstallp will prompt for package
+information and create a new template file based on user responses.
+
+Examples
+
+The following examples show the directory structure and template file for a
+variety of packaging scenarios. The root build directory for the following
+examples is /tmp/packages. A list of template keywords is defined after
+example 4.
+There may be additional supported template keywords.  To see them, run
+mkinstallp without -T, say yes to every request for a file and look at the
+resulting template file.
+
+Ex 1: PkgA - single fileset with no requisites and no ROOT part
+Ex 2: PkgB - single fileset with one prerequisite and ROOT part
+Ex 3: PkgC - single fileset with License agreement required
+Ex 4: PkgD - multiple filesets, one using requisite filename
+
+
+Ex 1: PkgA - single fileset with no requisites
+----------------------------------------------
+Directory Structure:
+
+/tmp/packages
+/tmp/packages/usr/doc/PkgA/README
+/tmp/packages/usr/PkgA/bin/acommand
+
+
+Template File:
+
+Package Name: PkgA
+Package VRMF: 1.0.0.0
+Update: N
+Fileset
+  Fileset Name: PkgA.rte
+  Fileset VRMF: 1.0.0.0
+  Fileset Description: My runtime fileset
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites:
+  USRFiles
+    /usr/doc/PkgA
+    /usr/doc/PkgA/README
+    /usr/PkgA
+    /usr/PkgA/bin
+    /usr/PkgA/bin/acommand
+  EOUSRFiles
+  ROOT Part: N
+  ROOTFiles
+  EOROOTFiles
+EOFileset
+
+
+Ex 2: PkgB - single fileset with one prerequisite and ROOT part
+---------------------------------------------------------------
+Directory Structure:
+
+/tmp/packages
+/tmp/packages/etc/PkgB/a.cfg
+/tmp/packages/usr/doc/PkgB/README
+/tmp/packages/usr/PkgB/bin/bcommand
+
+
+Template File:
+
+Package Name: PkgB
+Package VRMF: 1.1.0.0
+Update: N
+Fileset
+  Fileset Name: PkgB.rte
+  Fileset VRMF: 1.1.0.0
+  Fileset Description: My runtime fileset
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites: *prereq PkgA.rte 1.0.0.0;
+  USRFiles
+    /usr/doc/PkgB
+    /usr/doc/PkgB/README
+    /usr/PkgB
+    /usr/PkgB/bin
+    /usr/PkgB/bin/bcommand
+  EOUSRFiles
+  ROOT Part: Y
+  ROOTFiles
+    /etc/PkgB
+    /etc/PkgB/a.cfg
+  EOROOTFiles
+EOFileset 
+
+
+Ex 3: PkgC - single fileset with License agreement
+--------------------------------------------------
+Directory Structure:
+
+/tmp/packages
+/tmp/packages/usr/doc/PkgC/README
+/tmp/packages/usr/PkgC/bin/ccommand
+
+
+Template File:
+
+Package Name: PkgC
+Package VRMF: 1.0.1.0
+Update: N
+Fileset
+  Fileset Name: PkgC.rte
+  Fileset VRMF: 1.0.1.0
+  Fileset Description: My runtime fileset
+  Bosboot required: N
+  License agreement acceptance required: Y
+  Name of license agreement: LAR/usr/swlag/%L/LUM.la
+  Include license files in this package: N
+  Requisites:
+  USRFiles
+    /usr/doc/PkgC
+    /usr/doc/PkgC/README
+    /usr/PkgC
+    /usr/PkgC/bin
+    /usr/PkgC/bin/ccommand
+  EOUSRFiles
+  ROOT Part: N
+  ROOTFiles
+  EOROOTFiles
+EOFileset 
+
+
+Ex 4: PkgD - multiple filesets, one with requisite file
+-------------------------------------------------------
+Directory Structure:
+
+/tmp/packages
+/tmp/packages/etc/PkgD/a.cfg
+/tmp/packages/usr/doc/PkgD/README
+/tmp/packages/usr/PkgD/bin/acommand
+/tmp/packages/usr/PkgD/bin/bcommand
+
+
+Template File:
+
+Package Name: PkgD
+Package VRMF: 1.2.0.0
+Update: N
+Fileset
+  Fileset Name: PkgD.rte
+  Fileset VRMF: 1.2.0.0
+  Fileset Description: My runtime fileset
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites: /pkgdata/pkgD.rte/requisites
+  USRFiles
+    /usr/doc/PkgD
+    /usr/doc/PkgD/README
+    /usr/PkgD
+    /usr/PkgD/bin
+    /usr/PkgD/bin/acommand
+  EOUSRFiles
+  ROOT Part: Y
+  ROOTFiles
+    /etc/PkgD
+    /etc/PkgD/a.cfg
+  EOROOTFiles
+EOFileset 
+Fileset
+  Fileset Name: PkgD.data
+  Fileset VRMF: 1.2.0.0
+  Fileset Description: My data fileset
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites:
+  USRFiles
+    /usr/PkgD
+    /usr/PkgD/bin
+    /usr/PkgD/bin/bcommand
+  EOUSRFiles
+  ROOT Part: N
+  ROOTFiles
+  EOROOTFiles
+EOFileset 
+
+
+Template File Keywords
+
+Keywords with a * are required, and will cause mkinstallp to fail if left blank or
+omitted in the template file.
+
+Package Name          *- Name of the package
+Package VRMF          *- Version, Release, Modification, and Fix level of the package
+Update                *- Is this an update package?
+Fileset               *- Start of a new Fileset
+  Fileset Name        *- Name of the fileset
+  Fileset VRMF        *- VRMF of the fileset
+  Fileset Description *- Description of the fileset
+  Bosboot required    *- Is a bosboot required when installing this fileset?
+  License agreement acceptance required  *- Is license agreement acceptance required
+                                           for this filesest?
+  Name of license agreement              - Name of the license agreement (see Note 1)
+  Include license files in this package  *- Are the license files included in this
+                                           package?
+  License file path    - Path of the license file(s) (see Note 2)
+  Requisites           - co/if/inst/pre-requistes for the fileset (see Note 3)
+  USRFiles            *- Start of the USR part files section
+    /path/to/file      - File path (see Note 4)
+  EOUSRFiles          *- End of the USR part files section
+  ROOT Part           *- Is there a ROOT part included in this fileset?
+  ROOTFiles           *- Start of the ROOT part files section
+    /path/to/file      - File path (see Note 4)
+  EOROOTFiles         *- End of the ROOT part files section
+EOFileset             *- End of the Fileset
+
+Note 1: The Name of license agreement is defined as LAR/path/to/license/agreement.
+        The %L tag can be used in place of a hard coded path to represent the locale
+        of the machine that the package will be installed on. For example, if PkgC
+        is installed in the en_US locale, %L will be converted to en_US.
+
+Note 2: A License file path is defined as LAF/path/to/license/file. A conditional
+        License file path is defined as LAF<lc_LC>/path/to/license/file, where lc_LC
+        is the locale which is associated with the license file. An example conditional
+        License file path is LAF<en_US>/usr/swlag/en_US/prod.la. Either type of path
+        may be specified or both types. Multiple license file paths are separated by
+        semicolons.
+
+Note 3: Requisites are defined as *Type Name VRMF;. Type may be coreq, ifreq, instreq,
+        or prereq. Multiple requisites are separated by semicolons.
+        Requisites may also be an absolute pathname of a file specifying multiple or
+        complex requisites.
+
+Note 4: The full path name for each file in the fileset must be listed in the files
+        section. Any custom directories should also be listed in this section. For
+        example, to package /usr/PkgA/myFile, list both /usr/PkgA and /usr/PkgA/myFile in the
+        files section. Each entity in the final package will have the same attributes
+        (owner/group/permissions) that it had at build time. The user must ensure
+        that file attributes in the buildroot are correct prior to running mkinstallp.

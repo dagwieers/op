@@ -9,11 +9,13 @@ for pkg in rpm-build gcc glibc-devel; do
 	rpm -q $pkg > /dev/null ||
 	sudo yum install -y $pkg
 done
-mkdir -p $home/rpmbuild/SOURCES
+cd $home/op
+mkdir -p $home/rpmbuild/SOURCES packages
 ln -fs $home/op/op-$vers.tar.gz $home/rpmbuild/SOURCES
 cd $home/op/contrib/linux
 rpmbuild -bb $x11 op$X.spec
 arch | grep -q 64 &&
 CC='gcc -m32' rpmbuild --target=i386-linux -bb op.spec
 mv $home/rpmbuild/RPMS/*/op-$vers-1$dist.*.rpm .
-scp op-$vers-1$dist.*.rpm $rdist
+scp -p op-$vers-1$dist.*.rpm $rdist
+mv op-$vers-1$dist.*.rpm $home/op/packages/
