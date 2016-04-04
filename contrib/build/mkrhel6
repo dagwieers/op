@@ -1,0 +1,19 @@
+home=$HOME
+rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
+vers=1.32
+dist=.el$(tr -dc 0-9 < /etc/redhat-release | cut -c 1)
+type xauth | grep -q X11 && x11='--with x11' || x11=
+
+set -e
+for pkg in rpm-build gcc glibc-devel; do
+	rpm -q $pkg > /dev/null ||
+	sudo yum install -y $pkg
+done
+mkdir -p $home/rpmbuild/SOURCES
+ln -fs $home/op/op-$vers.tar.gz $home/rpmbuild/SOURCES
+cd $home/op/contrib/linux
+rpmbuild -bb $x11 op$X.spec
+arch | grep -q 64 &&
+CC='gcc -m32' rpmbuild --target=i386-linux -bb op.spec
+mv $home/rpmbuild/RPMS/*/op-$vers-1$dist.*.rpm .
+scp op-$vers-1$dist.*.rpm $rdist

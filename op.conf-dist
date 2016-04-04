@@ -1,0 +1,67 @@
+#
+# A simple example config for op(1). See the man page for more information or
+# op.conf.complex for a complex multi-user/multi-system configuration.
+#
+# Syntaxe:
+# VAR=value
+# DEFAULT option...
+# mnemonic  command [arg...] ; [option...]
+#
+# command : path | MAGIC_SHELL
+# arg : literal | $1..$n $*
+# option:
+#       uid=user (root) gid=group dir=dir chroot=dir umask=0### (022)
+#       groups=group|... users=user|... fowners=user:group fperms=0###
+#       password environment nolog xauth[=user] help="..."
+#       $VAR $VAR=... $1..$n $*
+
+# login : $SHELL $TERM $HOME $LOGNAME $PATH $MAIL
+# su : $SHELL $TERM $DISPLAY $XAUTHORITY $HOME $USER $LOGNAME $PATH
+# sudo -i : $DISPLAY $PATH $TERM $HOME $MAIL $SHELL $HOME $LOGNAME
+
+## List of privileged users
+
+GRP_PRIVALL=root|wheel|expl|prvall
+
+DEFAULT	$COLORS $DISPLAY $HOSTNAME $HISTSIZE $INPUTRC $KDEDIR $LS_COLORS
+	$MAIL $PS1 $PS2 $QTDIR $USERNAME $LANG $LC_ADDRESS $LC_CTYPE
+	$LC_COLLATE $LC_IDENTIFICATION $LC_MEASUREMENT $LC_MESSAGES
+	$LC_MONETARY $LC_NAME $LC_NUMERIC $LC_PAPER $LC_TELEPHONE
+	$LC_TIME $LC_ALL $LANGUAGE $LINGUAS $_XKB_CHARSET $TERM $XAUTHORITY
+
+## List of privileged commands
+
+id	/usr/bin/id $*;
+	groups=GRP_PRIVALL
+	help="id"
+
+env	/bin/env $*;
+	groups=GRP_PRIVALL
+	environment
+	help="env [arg...] + env"
+
+magic	MAGIC_SHELL;
+	groups=GRP_PRIVALL
+	environment
+	help="magic command [arg...] + env"
+
+sh	/bin/sh $*;
+	groups=GRP_PRIVALL
+	environment
+	help="sh [arg...] + env"
+
+-	/bin/su -;
+	groups=GRP_PRIVALL
+	$TERM $DISPLAY
+	help="su -"
+
+su	/bin/su $*;
+	help="su [arg...] + env"
+	groups=GRP_PRIVALL
+	environment
+
+op	/bin/su $*;
+	groups=GRP_PRIVALL
+	$TERM $DISPLAY $USER=root $LOGNAME=root
+	help="su [arg...] - env"
+

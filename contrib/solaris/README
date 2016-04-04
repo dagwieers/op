@@ -1,0 +1,6 @@
+copy the op binary to the bin directory
+
+# pkgmk -d `pwd`
+will create the package op in directory format
+# pkgtrans `pwd` op.pkg op
+will create  the package op.pkg in datastream format

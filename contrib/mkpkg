@@ -1,0 +1,32 @@
+[[ -n ${pkg} ]] || exit
+
+#pkg=xxx
+#ver=vXX.YY.ZZ
+ext=${ext:-tar.gz}
+inc=${inc:-.}
+exc=${exc+|${exc}}
+usr=${usr:-exploit}
+grp=${grp:-expl}
+dir=${dir:-${pkg}}
+user=${user:-esxide}
+host=${host:-recife}
+post=${post:-}
+rdir=${rdir:-/home/ftp/diffusion/exploitation/${pkg}/futur}
+now=$(date +%Y%m%d%H%M%S)
+
+sudo rm -rf /tmp/${pkg}_${ver}
+mkdir -p /tmp/${pkg}_${ver}/${dir}
+find ${inc} |
+egrep -v "\.#|~$|\.swp|\.gitignore|mkpkg${exc}" |
+cpio -pdm /tmp/${pkg}_${ver}/${dir}
+sudo chown -Rh ${usr}:${grp} /tmp/${pkg}_${ver}/${dir}
+sudo chmod -R g-s /tmp/${pkg}_${ver}/${dir}
+eval "${post}"
+sudo tar zcf /tmp/${pkg}_${ver}.${ext} -C /tmp/${pkg}_${ver} ${dir}
+tar zvtf /tmp/${pkg}_${ver}.${ext}
+sftp -o LogLevel=ERROR ${user}@${host} << EOF
+put /tmp/${pkg}_${ver}.${ext} ${rdir}/${pkg}_${ver}.${ext}
+ls -l ${rdir}
+quit
+EOF
+sudo rm -rf /tmp/${pkg}_${ver}
