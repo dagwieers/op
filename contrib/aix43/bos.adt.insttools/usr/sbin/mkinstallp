@@ -1,0 +1,1704 @@
+#!/bin/ksh
+# IBM_PROLOG_BEGIN_TAG 
+# This is an automatically generated prolog. 
+#  
+# bos52Q src/bos/usr/sbin/install/insttools/mkinstallp.sh 1.14 
+#  
+# Licensed Materials - Property of IBM 
+#  
+# Restricted Materials of IBM 
+#  
+# (C) COPYRIGHT International Business Machines Corp. 2003,2005 
+# All Rights Reserved 
+#  
+# US Government Users Restricted Rights - Use, duplication or 
+# disclosure restricted by GSA ADP Schedule Contract with IBM Corp. 
+#  
+# IBM_PROLOG_END_TAG 
+# @(#)42        1.14  src/bos/usr/sbin/install/insttools/mkinstallp.sh, cmdinstl, bos52Q, q2005_41A1 10/11/05 14:26:08
+
+##############################################################################80
+#                                                                              #
+# is_numeric                                                                   #
+#  Returns 1 if the input is numeric; 0 otherwise.                             #
+#                                                                              #
+################################################################################
+is_numeric()
+{
+  if [[ -z "$1" ]]; then
+    return 0
+  else
+    case "$1" in
+      *[!0-9]*) return 0;;
+             *) return 1;;
+    esac
+  fi
+}
+
+##############################################################################80
+#                                                                              #
+# is_YorN                                                                      #
+#  Returns 1 if the input is affirmative; 0 if negative; 2 if an error occurs. #
+#                                                                              #
+################################################################################
+is_YorN()
+{
+  typeset ANS="$1"  # local answer
+  typeset YESSTR
+  typeset NOSTR
+  typeset STR
+
+  [[ -z "$ANS" ]] && return 2
+
+  if [ -x /usr/bin/locale ]; then
+    # We should be able to use yes/no strings.
+    YESSTR=$(/bin/locale yesstr 2> /dev/null) || YESSTR="yes:y:Y:YES:Yes"
+    NOSTR=$(/bin/locale nostr 2> /dev/null) || NOSTR="no:n:N:NO:No"
+    YESSTR="$YESSTR:YES:Yes"
+    NOSTR="$NOSTR:NO:No"
+  else
+    YESSTR="yes:y:Y:YES:Yes"
+    NOSTR="no:n:N:NO:No"
+  fi
+
+  YESSTR="$YESSTR:1"
+  NOSTR="$NOSTR:0"
+
+  # Set the Internal Field Separator (IFS) to ":"
+  typeset IFS=:
+
+  for STR in $YESSTR; do
+    if [[ "$ANS" = "$STR" ]]; then
+      return 1
+    fi
+  done
+
+  for STR in $NOSTR; do
+    if [[ "$ANS" = "$STR" ]]; then
+      return 0
+    fi
+  done
+
+  # If we go here, then something went wrong
+  return 2
+}
+
+##############################################################################80
+#                                                                              #
+# create_template                                                              #
+#  Prompts the user for package info and creates the template file based on    #
+#   the responses.                                                             #
+#                                                                              #
+################################################################################
+create_template()
+{
+  # Get an affirmative and negative value
+  if [ -x /usr/bin/locale ]; then
+    # We should be able to use yes/no strings.
+    YES=$(/bin/locale yesstr | awk -F: '{print $3}' 2> /dev/null) || YES="Y"
+    NO=$(/bin/locale nostr | awk -F: '{print $3}' 2> /dev/null) || NO="N"
+  else
+    YES="Y"
+    NO="N"
+  fi
+
+  # Make sure we've got a vaid VRMF number
+  let VALID_VRMF=0
+  while [[ $VALID_VRMF -eq 0 ]]; do
+    case $PACKAGE_VRMF in
+      +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) let VALID_VRMF=1;;
+                                         *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 13 \
+                                            "* Package VRMF (1.0.0.0) []: \n"` 
+                                            read PACKAGE_VRMF?"$MESG";;
+    esac
+  done
+  MESG="Package VRMF: $PACKAGE_VRMF" 
+  print "$MESG" >> $TEMPLATE_FILE
+
+
+  is_YorN "$UPDATE"
+  while [[ $? -eq 2 ]]; do
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 14 "Update ($YES/$NO) [$NO]: \n"` 
+    read UPDATE?"$MESG"
+    if [[ -z "$UPDATE" ]]; then
+      UPDATE="$NO"
+    fi
+    is_YorN "$UPDATE"
+  done
+  MESG="Update: $UPDATE" 
+  print "$MESG" >> $TEMPLATE_FILE 
+
+
+  is_numeric "$NUM_FILESETS"
+  until [[ $? -eq 1 ]]; do
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 15 "Number of filesets in %s (1) [1]: \n" "$PACKAGE_NAME"`
+    read NUM_FILESETS?"$MESG"
+    if [[ -z "$NUM_FILESETS" ]]; then
+      let NUM_FILESETS=1
+    fi
+    is_numeric "$NUM_FILESETS"
+  done
+ 
+
+  # Since we're gonna enter this loop for each fileset, set all the
+  #  fileset-specific variables to null right from the onslaught. Otherwise,
+  #  subsequent iterations through the loop may try to use values from the
+  #  previous time through.
+  while (( NUM_FILESETS > 0 )); do
+    ADD=
+    ADD_NUM=
+    ADD_PATH=
+    ADD_SPACE=
+    BOSBOOT=
+    CONFIG=
+    CONFIG_PATH=
+    COUNT=
+    CREATE_ROOT=
+    FILESET_DESC=
+    FILESET_NAME=
+    FILESET_VRMF=
+    LAF=
+    LAR=
+    LIC_INCLUDED=
+    LIC_REQUIRED=
+    NUM_ADDS=
+    NUM_FILES=
+    NUM_LAFS=
+    NUM_REQS=
+    REQ_FILE=
+    POST=
+    POST_PATH=
+    PRE=
+    PRE_PATH=
+    PRERM=
+    PRERM_PATH= 
+    REQUISITES=
+    UNPRE=
+    UNPRE_PATH=
+    UNPOST=
+    UNPOST_PATH=
+    UNCONFIG=
+    UNCONFIG_PATH=
+
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 16 \
+         "\n Gathering info for new fileset (%ld remaining)\n" "$NUM_FILESETS"`
+    print "$MESG"
+    print "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+
+    # Start printing the fileset section of the template file.
+    MESG="Fileset"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    # General Fileset Info
+    while [[ -z "$FILESET_NAME" ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 17 "* Fileset Name (%s) []: \n" "${PACKAGE_NAME}.rte"`
+      read FILESET_NAME?"$MESG"
+      if [[ $FILESET_NAME != ${PACKAGE_NAME}* ]]; then
+         FILESET_NAME=""
+      fi
+    done
+    MESG="  Fileset Name: $FILESET_NAME"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    # Make sure we've got a valid VRMF
+    let VALID_VRMF=0
+    while [[ $VALID_VRMF -eq 0 ]]; do
+      case $FILESET_VRMF in
+        +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) let VALID_VRMF=1;;
+                                           *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 18 \
+                                              "* Fileset VRMF (1.0.0.0) []: \n"`
+                                              read FILESET_VRMF?"$MESG";;
+      esac
+    done
+    MESG="  Fileset VRMF: $FILESET_VRMF"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    while [[ -z "$FILESET_DESC" ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 19 "* Fileset Description (some text) []: \n"`
+      read FILESET_DESC?"$MESG"
+    done
+    MESG="  Fileset Description: $FILESET_DESC"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    # Ask the usrs if they have a pre_i/u script they want to run
+    is_YorN "$PRE"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 20 \
+           "Do you want to include an installp pre_i/u script for this fileset? ($YES/$NO) [$NO]: \n"`
+      read PRE?"$MESG"
+      if [[ -z "$PRE" ]]; then
+        PRE="$NO"
+      fi
+      is_YorN "$PRE"
+    done
+
+    is_YorN "$PRE"
+    if [[ $? -eq 1 ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 21 \
+           "Enter the absolute path of the pre_i/u script to include []: \n"`
+      read PRE_PATH?"$MESG"
+      while [[ ! -f /$PRE_PATH ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+             "0503-846 %s: Script not found. Re-enter the absolute script path [] : \n" "$CMDNAME"`
+        read PRE_PATH?"$MESG"
+      done
+      # if there is no / at the beginning of the path, add one
+      if [[ -z ${PRE_PATH%%/*} ]]; then
+        MESG="  Pre-installation Script: $PRE_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      else
+        MESG="  Pre-installation Script: /$PRE_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      fi
+
+      # If they gave a pre-i/u script, ask if they want to include an unpre-i/u script
+      is_YorN "$UNPRE"
+      while [[ $? -eq 2 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 23 \
+             "Do you want to include an installp unpre_i/u script for this fileset? ($YES/$NO) [$NO]: \n"`
+        read UNPRE?"$MESG"
+        if [[ -z "$UNPRE" ]]; then
+          UNPRE="$NO"
+        fi
+        is_YorN "$UNPRE"
+      done
+
+      is_YorN "$UNPRE"
+      if [[ $? -eq 1 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 24 \
+             "Enter the absolute path of the unpre_i/u script to include []: \n"`
+        read UNPRE_PATH?"$MESG"
+        while [[ ! -f /$UNPRE_PATH ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+               "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"`
+          read UNPRE_PATH?"$MESG"
+        done
+        # if there is no /at the beginning of the path, add one /
+        if [[ -z ${UNPRE_PATH%%/*} ]]; then
+          MESG="  Unpre-installation Script: $UNPRE_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        else
+          MESG="  Unpre-installation Script: /$UNPRE_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        fi
+      fi
+    fi
+
+
+    # Ask the usrs if they have post_i/u script they want to run
+    is_YorN "$POST"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 25 \
+           "Do you want to include an installp post_i/u script for this fileset? ($YES/$NO) [$NO]: \n"`
+      read POST?"$MESG"
+      if [[ -z "$POST" ]]; then
+        POST="$NO";
+      fi
+      is_YorN "$POST"
+    done
+
+    is_YorN "$POST"
+    if [[ $? -eq 1 ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 26 \
+           "Enter the absolute path of the post_i/u script to include []: \n"`
+      read POST_PATH?"$MESG"
+      while [[ ! -f /$POST_PATH ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+             "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"`
+        read POST_PATH?"$MESG"
+      done
+      # if there is no /at the beginning of the path, add one /
+      if [[ -z ${POST_PATH%%/*} ]]; then
+         MESG="  Post-installation Script: $POST_PATH"
+         print "$MESG" >> $TEMPLATE_FILE
+      else
+         MESG="  Post-installation Script: /$POST_PATH"
+         print "$MESG" >> $TEMPLATE_FILE
+      fi
+
+      # If they gave a post-i/u script, ask if they want to include an unpost-i/u script
+      is_YorN "$UNPOST"
+      while [[ $? -eq 2 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 27 \
+             "Do you want to include an installp unpost_i/u script for this fileset? ($YES/$NO) [$NO]: \n"`
+        read UNPOST?"$MESG"
+        if [[ -z "$UNPOST" ]]; then
+          UNPOST="$NO";
+        fi
+        is_YorN "$UNPOST"
+      done
+
+      is_YorN "$UNPOST" 
+      if [[ $? -eq 1 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 28 \
+             "Enter the absolute path of the unpost_i/u script to include []: \n"`
+        read UNPOST_PATH?"$MESG"
+        while [[ ! -f /$UNPOST_PATH ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+            "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"`
+          read UNPOST_PATH?"$MESG"
+        done
+        # if there is no /at the beginning of the path, add one /
+        if [[ -z ${UNPOST_PATH%%/*} ]]; then
+          MESG="  Unpost-installation Script: $UNPOST_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        else
+          MESG="  Unpost-installation Script: /$UNPOST_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        fi
+      fi
+    fi
+
+
+    # Ask the usrs if they have pre_rm script they want to run
+    is_YorN "$PRERM"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 89 \
+           "Do you want to include an installp pre_rm script for this fileset? ($YES/$NO) [$NO]: \n"`
+      read PRERM?"$MESG"
+      if [[ -z "$PRERM" ]]; then
+        PRERM="$NO";
+      fi
+      is_YorN "$PRERM"
+    done
+
+    is_YorN "$PRERM"
+    if [[ $? -eq 1 ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 90 \
+           "Enter the absolute path of the pre_rm script to include []: \n"`
+      read PRERM_PATH?"$MESG"
+      while [[ ! -f /$PRERM_PATH ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+             "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"`
+        read PRERM_PATH?"$MESG"
+      done
+      # if there is no /at the beginning of the path, add one /
+      if [[ -z ${PRERM_PATH%%/*} ]]; then
+        MESG="  Pre_rm Script: $PRERM_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      else
+        MESG="  Pre_rm Script: /$PRERM_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      fi
+    fi
+
+
+    # Ask users if they want to include an installp config script
+    is_YorN "$CONFIG"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 29 \
+           "Do you want to include an installp config script for this fileset? ($YES/$NO) [$NO]: \n"`
+      read CONFIG?"$MESG"
+      if [[ -z "$CONFIG" ]]; then
+        CONFIG="$NO";
+      fi
+      is_YorN "$CONFIG"
+    done
+
+    is_YorN "$CONFIG"
+    if [[ $? -eq 1 ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 30 \
+           "Enter the absolute path of the config script to include []: \n"`
+      read CONFIG_PATH?"$MESG"
+      while [[ ! -f /$CONFIG_PATH ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+             "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"`           
+        read CONFIG_PATH?"$MESG"
+      done
+      # if there is no /at the beginning of the path, add one /
+      if [[ -z ${CONFIG_PATH%%/*} ]]; then
+        MESG="  Configuration Script: $CONFIG_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      else
+        MESG="  Configuration Script: /$CONFIG_PATH"
+        print "$MESG" >> $TEMPLATE_FILE
+      fi
+
+      # If they gave a config script, ask if they want to include an unconfig script
+      is_YorN "$UNCONFIG"
+      while [[ $? -eq 2 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 31 \
+             "Do you want to include an installp unconfig script for this fileset? ($YES/$NO) [$NO]: \n"`
+        read UNCONFIG?"$MESG"
+        if [[ -z "$UNCONFIG" ]]; then
+          UNCONFIG="$NO";
+        fi
+        is_YorN "$UNCONFIG"
+      done
+
+      is_YorN "$UNCONFIG"
+      if [[ $? -eq 1 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 32 \
+             "Enter the absolute path of the unconfig script to include []: \n"`
+        read UNCONFIG_PATH?"$MESG"
+        while [[ ! -f /$UNCONFIG_PATH ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 22 \
+               "0503-846 %s: Script not found. Re-enter the absolute script path []: \n" "$CMDNAME"` 
+          read UNCONFIG_PATH?"$MESG"
+        done
+        # if there is no /at the beginning of the path, add one /
+        if [[ -z ${UNCONFIG_PATH%%/*} ]]; then
+          MESG="  Unconfiguration Script: $UNCONFIG_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        else
+          MESG="  Unconfiguration Script: /$UNCONFIG_PATH"
+          print "$MESG" >> $TEMPLATE_FILE
+        fi
+      fi
+    fi
+ 
+
+    is_YorN "$BOSBOOT"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 33 "Bosboot required ($YES/$NO) [$NO]: \n"`
+      read BOSBOOT?"$MESG"
+      if [[ -z "$BOSBOOT" ]]; then
+        BOSBOOT="$NO"
+      fi
+      is_YorN "$BOSBOOT"
+    done
+    MESG="  Bosboot required: $BOSBOOT"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    # Fileset Licensing Info
+    is_YorN "$LIC_REQUIRED"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 34 "License agreement acceptance required ($YES/$NO) [$NO]: \n"` 
+      read LIC_REQUIRED?"$MESG"
+      if [[ -z "$LIC_REQUIRED" ]]; then
+        LIC_REQUIRED="$NO";
+      fi
+      is_YorN "$LIC_REQUIRED"
+    done
+    MESG="  License agreement acceptance required: $LIC_REQUIRED"
+    print "$MESG" >> $TEMPLATE_FILE
+
+    # If a license agreement is required, get the name of the LAR.
+    is_YorN "$LIC_REQUIRED"
+    if [[ $? -eq 1 ]]; then
+      while [[ -z "$LAR" ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 35 "* Name of license agreement (/usr/swlag/\%L/LUM.la) []: \n"`
+        read LAR?"$MESG"
+      done
+      # if there is no /at the beginning of the path, add one /
+      if [[ -z ${LAR%%/*} ]]; then
+         MESG="  Name of license agreement: LAR$LAR"
+         print "$MESG" >> $TEMPLATE_FILE
+      else
+         MESG="  Name of license agreement: LAR/$LAR"
+         print "$MESG" >> $TEMPLATE_FILE
+      fi 
+    fi
+
+
+    is_YorN "$LIC_INCLUDED"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 37 \
+           "Include license files for %s in this package ($YES/$NO) [$NO]: \n" "$FILESET_NAME"`
+      read LIC_INCLUDED?"$MESG"
+      if [[ -z "$LIC_INCLUDED" ]]; then
+        LIC_INCLUDED="$NO";
+      fi
+      is_YorN "$LIC_INCLUDED"
+    done
+    MESG="  Include license files in this package: $LIC_INCLUDED"
+    print "$MESG" >> $TEMPLATE_FILE
+
+    # If license files are included in this package, get the LAF pathnames.
+    is_YorN "$LIC_INCLUDED"
+    if [[ $? -eq 1 ]]; then
+      is_numeric "$NUM_LAFS"
+      until [[ $? -eq 1 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 38 \
+             "Number of license files included for %s (1) [1]: \n" "$FILESET_NAME"`
+        read NUM_LAFS?"$MESG"
+        if [[ -z "$NUM_LAFS" ]]; then
+          let NUM_LAFS=1
+        fi
+        is_numeric "$NUM_LAFS"
+      done
+
+      # Set laf path to null each time through the loop.
+      let COUNT=1
+      while (( COUNT <= NUM_LAFS )); do
+        LAF_PATH=
+
+        while [[ -z "$LAF_PATH" ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 39 \
+               "* %ld of %ld. License file path (/usr/swlag/en_US/xyz.la) []: \n" "$COUNT" "$NUM_LAFS"`
+          read LAF_PATH?"$MESG"
+        done
+        while [[ ! -f $ROOT_DIR/$LAF_PATH ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 40 "0503-848 %s: * %s%s does not exist.\n \
+\tRe-enter license file path []: \n" "$CMDNAME" "$ROOT_DIR" "$LAF_PATH"` 
+          read LAF_PATH?"$MESG"
+        done
+        # If there is no / at the beginning of the path, add one /
+        if [[ -z ${LAF_PATH%%/*} ]]; then
+           LAF=`echo "${LAF}LAF${LAF_PATH};"`
+        else
+           LAF=`echo "${LAF}LAF/${LAF_PATH};"`
+        fi
+        let COUNT='COUNT+1'
+      done
+      
+      MESG="  License file path: $LAF"
+      print "$MESG" >> $TEMPLATE_FILE
+    fi
+
+    # Ask the users if they want to specify a Requisite file
+    is_YorN "$REQ_FILE"
+    while [[ $? -eq 2 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 103 \
+           "Do you want to specify Requisites using a file for this fileset? ($YES/$NO) [$NO]: \n"`
+      read REQ_FILE?"$MESG"
+      if [[ -z "$REQ_FILE" ]]; then
+        REQ_FILE="$NO";
+      fi
+      is_YorN "$REQ_FILE"
+    done
+
+    # Get the Requisite file pathname
+    is_YorN "$REQ_FILE"
+    if [[ $? -eq 1 ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 104 \
+           "Enter the absolute path of the Requisite file to use []: \n"`
+      read REQUISITES?"$MESG"
+      while [[ ! -z ${REQUISITES%%/*} || ! -f "$REQUISITES" \
+               || ! -r "$REQUISITES" ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 105 \
+           "File not found. Re-enter the absolute Requisite file path []: \n"`
+        read REQUISITES?"$MESG"
+      done
+      print "  Requisites: $REQUISITES" >> $TEMPLATE_FILE
+    fi
+
+    # Get the Requisite line(s) if any
+    is_YorN "$REQ_FILE"
+    if [[ $? -eq 0 ]]; then # if not Requisite file
+      # Fileset Requisite Info
+      is_numeric "$NUM_REQS"
+      until [[ $? -eq 1 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 41 "Number of Requisites for %s (1) [0]: \n" "$FILESET_NAME"`
+        read NUM_REQS?"$MESG"
+        if [[ -z "$NUM_REQS" ]]; then
+           let NUM_REQS=0
+        fi
+        is_numeric "$NUM_REQS"
+      done
+
+      # Set req-specific vars to null each time through the loop.
+      let COUNT=1
+      while (( COUNT <= NUM_REQS )); do
+        REQ_NAME=
+        REQ_TYPE=
+        REQ_VRMF=
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 42 \
+           "%ld of %ld. Requisite Type (coreq/ifreq/instreq/prereq) [prereq]: \n" "$COUNT" "$NUM_REQS"`
+        read REQ_TYPE?"$MESG"
+        if [[ -z "$REQ_TYPE" ]]; then
+          REQ_TYPE="prereq"
+        fi
+
+        while [[ $REQ_TYPE != "coreq" && $REQ_TYPE != "ifreq" \
+                 && $REQ_TYPE != "instreq" && $REQ_TYPE != "prereq" ]]; do 
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 42 \
+            "%ld of %ld. Requisite Type (coreq/ifreq/instreq/prereq) [prereq]: \n" "$COUNT" "$NUM_REQS"`
+          read REQ_TYPE?"$MESG"
+        done
+        while [[ -z "$REQ_NAME" ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 43 \
+             "* %ld of %ld. Requisite Name (abc.rte) []: \n" "$COUNT" "$NUM_REQS"`
+          read REQ_NAME?"$MESG"
+        done
+        while [[ -z "$REQ_VRMF" ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 44 \
+             "* %ld of %ld. Requisite VRMF (1.0.0.0) []: \n" "$COUNT" "$NUM_REQS"`
+          read REQ_VRMF?"$MESG"
+        done
+
+        let VALID_VRMF=0
+        while [[ $VALID_VRMF -eq 0 ]]; do
+          case $REQ_VRMF in
+            +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) let VALID_VRMF=1;;
+            *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 44 \
+                     "* %ld of %ld. Requisite VRMF (1.0.0.0) []: \n" "$COUNT" "$NUM_REQS"`
+               read REQ_VRMF?"$MESG";;
+          esac
+        done
+
+        REQUISITES=`echo "${REQUISITES}*${REQ_TYPE} ${REQ_NAME} ${REQ_VRMF};"`
+        let COUNT='COUNT+1'
+      done
+      MESG="  Requisites: $REQUISITES"
+      print "$MESG" >> $TEMPLATE_FILE
+    fi # if not Requisite file
+
+
+    is_numeric "$ADD_NUM"
+    until [[ $? -eq 1 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 96 \
+           "Number of filesystems requiring additional space for %s [0]: \n" "$FILESET_NAME"`
+      read ADD_NUM?"$MESG"
+      if [[ -z "$ADD_NUM" ]]; then
+        let ADD_NUM=0
+      fi
+      is_numeric "$ADD_NUM"
+    done
+
+    # Gather info about additional file space
+    let COUNT=1
+    while (( COUNT <= ADD_NUM )); do
+      ADD_PATH= 
+      ADD_SPACE=
+      while [[ -z "$ADD_PATH" ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 47 \
+             "* %ld of %ld. Filesystem path (/tmp) []: \n" "$COUNT" "$ADD_NUM"` 
+        read ADD_PATH?"$MESG"
+      done
+
+      is_numeric "$ADD_SPACE"
+      until [[ $? -eq 1 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 49 \
+             "* Required space for this filesystem in 512 byte blocks []: \n"`
+        read ADD_SPACE?"$MESG"
+        is_numeric "$ADD_SPACE"
+      done
+
+      if [[ -z ${ADD_PATH%%/*} ]]; then
+        ADD=`echo "${ADD}${ADD_PATH} ${ADD_SPACE}; "`
+      else
+        ADD=`echo "${ADD}/${ADD_PATH} ${ADD_SPACE}; "`
+      fi
+      let COUNT='COUNT+1'
+    done
+    if [[ $ADD_NUM -gt 0 ]]; then
+      MESG="  Upsize: $ADD"
+      print "$MESG" >> $TEMPLATE_FILE
+    fi
+
+
+    # Fileset USR part Files Info
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 50 \
+         "\nYou should include any directories that you are creating in the file count.\n"`
+    print "$MESG"
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 97 \
+         "(ie: For /usr/proj/myFile, enter 2; 1 for /usr/proj and 1 for /usr/proj/myFile)\n"` 
+    print "$MESG"
+
+    is_numeric "$NUM_FILES"
+    until [[ $? -eq 1 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 98 \
+           "Number of USR part Files in %s (1) [0]: \n" "$FILESET_NAME"` 
+      read NUM_FILES?"$MESG"
+      if [[ -z "$NUM_FILES" ]]; then
+         let NUM_FILES=0
+      fi
+      is_numeric "$NUM_FILES"
+    done
+
+    MESG="  USRFiles"
+    print "$MESG" >> $TEMPLATE_FILE
+    let COUNT=1
+    while (( COUNT <= NUM_FILES )); do
+      FILE_NAME=
+      AGREE=
+      
+      while [[ -z $FILE_NAME ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 99 \
+             "* %ld of %ld. Directory or File Path (/usr/proj/myFile) []: \n" "$COUNT" "$NUM_FILES"`
+        read FILE_NAME?"$MESG"
+      done
+
+      # Warn user if they are shipping a file that exists as a part of another fileset
+      # and make sure the file or directory exists in the build root directory
+      if [[ -z ${FILE_NAME%%/*} ]]; then
+        lslpp -w $FILE_NAME >/dev/null
+      else
+        lslpp -w /$FILE_NAME >/dev/null
+      fi
+      if [[ ($? -eq 0) && (! -d /$FILE_NAME) && (! -L /$FILE_NAME) ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 100 \
+             "This file exists in another fileset on the system.\n"` 
+        print "$MESG"
+        is_YorN "$AGREE"
+        while [[ $? -eq 2 ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 55 \
+               "Are you sure you want to include this file? ($YES/$NO) []: \n"` 
+          read AGREE?"$MESG"
+          is_YorN "$AGREE"
+        done
+      fi
+
+      # Kill two birds here. If the file doesn't exist, proceed as if the user hadn't agreed
+      # to the check above. This will cause us to reenter the loop at the current count.
+      if [[ ! -e $ROOT_DIR/$FILE_NAME ]]; then
+        AGREE="$NO"
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 101 "File or directory does not exist.\n"`
+        print "$MESG"
+      fi
+
+      # Only process this file if user agrees (or isn't affected by the checks above)
+      is_YorN "$AGREE"
+      if [[ $? -ne 0 ]]; then
+        # if there is no / at the beginning of the path, add one
+        if [[ -z ${FILE_NAME%%/*} ]]; then  
+          MESG="    $FILE_NAME"
+          print "$MESG" >> $TEMPLATE_FILE
+        else
+          MESG="    /$FILE_NAME"
+          print "$MESG" >> $TEMPLATE_FILE 
+        fi
+
+        let COUNT='COUNT+1'
+      fi
+    done
+    MESG="  EOUSRFiles"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    # Fileset ROOT part Files Info
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 50 \
+         "\nYou should include any directories that you are creating in the file count.\n"`
+    print "$MESG"
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 95 \
+         "(ie: For /etc/proj/myFile, enter 2; 1 for /etc/proj and 1 for /etc/proj/myFile)\n"` 
+    print "$MESG"
+
+    # Clear NUM_FILE again (since USR part above may have set it)
+    NUM_FILES=
+    is_numeric "$NUM_FILES"
+    until [[ $? -eq 1 ]]; do
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 48 \
+           "Number of ROOT part files in %s (1) [0]: \n" "$FILESET_NAME"`
+      read NUM_FILES?"$MESG"
+      if [[ -z "$NUM_FILES" ]]; then
+         let NUM_FILES=0
+      fi
+      is_numeric "$NUM_FILES"
+    done
+
+    if [[ NUM_FILES -eq 0 ]]; then
+      is_YorN "$CREATE_ROOT"
+      while [[ $? -eq 2 ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 93 \
+             "Would you like to create an empty ROOT part? ($YES/$NO) [$NO]: \n"`
+        read CREATE_ROOT?"$MESG"
+        if [[ -z "$CREATE_ROOT" ]]; then
+          CREATE_ROOT="$NO";
+        fi
+        is_YorN "$CREATE_ROOT"
+      done
+    else
+      CREATE_ROOT="$YES"
+    fi
+    MESG="  ROOT Part: $CREATE_ROOT"
+    print "$MESG" >> $TEMPLATE_FILE
+
+
+    MESG="  ROOTFiles"
+    print "$MESG" >> $TEMPLATE_FILE
+    let COUNT=1
+    while (( COUNT <= NUM_FILES )); do
+      FILE_NAME=
+      AGREE=
+      
+      while [[ -z "$FILE_NAME" ]]; do
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 92 \
+             "* %ld of %ld. Directory or File Path (/etc/proj/myFile) []: \n" "$COUNT" "$NUM_FILES"`
+        read FILE_NAME?"$MESG"
+      done
+
+      # Warn user if they are shipping a file that exists as a part of another fileset
+      # and make sure the file or directory exists in the build root directory
+      if [[ -z ${FILE_NAME%%/*} ]]; then
+        lslpp -w $FILE_NAME >/dev/null
+      else
+        lslpp -w /$FILE_NAME >/dev/null
+      fi
+      if [[ ($? -eq 0) && (! -d /$FILE_NAME) && (! -L /$FILE_NAME) ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 54 \
+             "0503-850 %s: This file exists in another fileset on the system.\n" "$CMDNAME"` 
+        print "$MESG"
+        is_YorN "$AGREE"
+        while [[ $? -eq 2 ]]; do
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 55 \
+               "Are you sure you want to include this file? ($YES/$NO) []: \n"`
+          read AGREE?"$MESG"
+          is_YorN "$AGREE"
+        done
+      fi
+
+      # Kill two birds here. If the file doesn't exist, proceed as if the user hadn't agreed
+      # to the check above. This will cause us to reenter the loop at the current count.
+      if [[ ! -e $ROOT_DIR/$FILE_NAME ]]; then
+        AGREE="$NO"
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 56 "0503-851 %s: File or directory does not exist.\n" "$CMDNAME"`
+        print "$MESG"
+      fi
+
+      # Only process this file if user agrees (or isn't affected by the checks above)
+      is_YorN "$AGREE"
+      if [[ $? -ne 0 ]]; then
+        # if there is no / at the beginning of the path, add one
+        if [[ -z ${FILE_NAME%%/*} ]]; then
+          MESG="    $FILE_NAME"
+          print "$MESG" >> $TEMPLATE_FILE
+        else
+          MESG="    /$FILE_NAME"
+          print "$MESG" >> $TEMPLATE_FILE
+        fi
+
+        let COUNT='COUNT+1'
+      fi
+    done
+    MESG="  EOROOTFiles"
+    print "$MESG" >> $TEMPLATE_FILE
+
+    let NUM_FILESETS='NUM_FILESETS-1'
+    MESG="EOFileset"
+    print "$MESG" >> $TEMPLATE_FILE
+
+    # Print out a blank line to signify our moving on from this fileset
+    print ""
+  done
+}
+
+
+##############################################################################80
+#                                                                              #
+# parse_template                                                               #
+#  Parse the first part of the template file. Once we hit a fileset, pass      #
+#  it over to the fileset parsing function, ParseFileset. Display a warning if #
+#  we don't recognize something in the template file.                          #
+#                                                                              #
+################################################################################
+parse_template()
+{
+  while read PKG_LINE; do
+    PKG_LINE=${PKG_LINE#[ ]*}     # Strip leading spaces
+    PKG_KEYWORD=${PKG_LINE%%:*}   # Get keyword (before first colon)
+    REST_PKG_LINE=${PKG_LINE#*:}  # Get everything after the first colon
+
+    # Ignore blank lines and comments
+    if [[ ! -z "$PKG_KEYWORD" && "$PKG_KEYWORD" != \#* ]]; then
+      case $PKG_KEYWORD in
+        "Package Name"  ) PACKAGE_NAME=${REST_PKG_LINE#[ ]*}                ;;
+        "Package VRMF"  ) PACKAGE_VRMF=${REST_PKG_LINE#[ ]*}                ;;
+        "Update"        ) UPDATE=${REST_PKG_LINE#[ ]*}                      ;;
+        "Fileset"       ) parse_fileset                                     ;;
+        *               ) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 58 \
+                          "0503-852 %s: Unknown keyword (%s)\n \
+                          \tin %s\n" "$CMDNAME" "$PKG_KEYWORD" "$TEMPLATE_FILE"` 
+                          print "$MESG"                                     ;;
+
+      esac
+    fi
+  done
+}
+
+
+##############################################################################80
+#                                                                              #
+# parse_fileset                                                                #
+#  Parse the Fileset section of the template file. Write out our list file     #
+#  after we've got all the info about this fileset. When we hit the Files      #
+#  section, pass control to the Files parsing function, ParseFiles. Display a  #
+#  warning if we don't recognize something in the template file.               #
+#                                                                              #
+################################################################################
+parse_fileset()
+{
+  # Make sure after reading the first fileset template, make the variables null,
+  # so that it does not try to use the previous fileset values
+  ADD=
+  ADD_PATH=
+  ADD_REMAINING=
+  ADD_SINGLE=
+  ADD_SPACE=
+  BOSBOOT=
+  CONFIG=
+  CONFIG_FILE=
+  CONFIG_PATH=
+  COUNT=
+  CREATE_ROOT=
+  FILESET_DESC=
+  FILESET_NAME=
+  FILESET_VRMF=
+  LAF=
+  LAF_REMAINING=
+  LAF_SINGLE=
+  LAR=
+  LIC_INCLUDED=
+  LIC_REQUIRED=
+  NUM_FILES=
+  NUM_LAFS=
+  NUM_REQS=
+  POST=
+  POST_FILE=
+  POST_PATH=
+  PRE=
+  PRE_FILE=
+  PRE_PATH=
+  PRERM=
+  PRERM_FILE=
+  PRERM_PATH=
+  REQUISITES=
+  REQ_NAME=
+  REQ_REMAINING=
+  REQ_SINGLE=
+  REQ_TYPE=
+  REQ_VRMF=
+  UNCONFIG=
+  UNCONFIG_FILE=
+  UNCONFIG_PATH=
+  UNPOST=
+  UNPOST_FILE=
+  UNPOST_PATH=
+  UNPRE=
+  UNPRE_FILE=
+  UNPRE_PATH=
+
+  # When we reach the EOFileset keyword, write out our info to the list file
+  while read FILESET_LINE; do
+    if [[ $FILESET_LINE = "EOFileset" ]]; then
+      # The list file contains package and fileset definitions
+      LIST_FILE=$CONTROL_FILE_DIR/list
+
+      # Make sure we've got a valid update flag for this package
+      # Set fileset.insize or fileset.upsize if update
+      is_YorN "$UPDATE"
+      RC=$?
+      if [[ $RC -eq 1 ]]; then
+        UPDATE_FLAG="S"
+        SIZE_FILE=$CONTROL_FILE_DIR/${FILESET_NAME##*[ ]}.upsize
+      elif [[ $RC -eq 0 ]]; then
+        UPDATE_FLAG="I"
+        SIZE_FILE=$CONTROL_FILE_DIR/${FILESET_NAME##*[ ]}.insize
+      else
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 59 "0503-853 %s: Invalid Update value (%s)\n \
+\tin %s\n" "$CMDNAME" "$UPDATE" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+
+      # Do some sanity checking; we need to have the following values, so if
+      #  they are non-existent or contain unexpected values, exit out.
+      if [[ -z "$PACKAGE_NAME" ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 60 "0503-854 %s: Package Name is missing\n \
+\tfrom %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      elif [[ -z "$PACKAGE_VRMF" ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 61 "0503-855 %s: Package VRMF is missing\n \
+\tfrom %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      elif [[ -z "$UPDATE" ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 62 "0503-856 %s: Update is missing\n \
+\tfrom %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      elif [[ -z "$FILESET_NAME" ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 63 "0503-857 %s: Fileset Name is missing\n \
+\tfrom %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      elif [[ $FILESET_NAME != ${PACKAGE_NAME}* ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 102 "0503-888 %s: Fileset Name is invalid\n \
+\tin %s\n" "$CMDNAME" "$TEMPLATE_FILE"`
+        print >&2 "$MESG"
+        exit 1;
+      elif [[ -z "$FILESET_VRMF" ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 64 "0503-858 %s: Fileset VRMF is missing\n \
+\tfrom %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+
+      # Make sure PACKAGE_VRMF and FILESET_VRMF have the correct format
+      case $PACKAGE_VRMF in
+        +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) ;;
+                                           *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 65 \
+                                              "0503-859 %s: Invalid PACKAGE_VRMF (%s)\n \
+                                              \tin %s\n" "$CMDNAME" "$PACKAGE_VRMF" "$TEMPLATE_FILE"` 
+                                              print >&2 "$MESG"
+                                              exit 1 ;;
+      esac
+
+      case $FILESET_VRMF in
+        +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) ;;
+                                           *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 66 \
+                                              "0503-860 %s: Invalid FILESET_VRMF (%s)\n \
+                                              \tin %s\n" "$CMDNAME" "$FILESET_VRMF" "$TEMPLATE_FILE"` 
+                                              print >&2 "$MESG"
+                                              exit 1 ;;
+      esac
+
+      # Add a default description if we weren't given one
+      if [[ -z "$FILESET_DESC" ]]; then
+         FILESET_DESC="mkinstallp generated fileset"
+      fi
+
+      # For the following installp scripts, copy them to the .info dir if they exist.
+      # Make sure we've got a valid pre-installation file
+      if [[ ! -z "$PRE_PATH" ]]; then
+        if [[ ! -f /$PRE_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 67 "0503-861 %s: installp pre_i/u script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$PRE_PATH" "$TEMPLATE_FILE"`
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            PRE_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.pre_i
+          else
+            PRE_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.pre_u
+          fi
+          cp $PRE_PATH $PRE_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid unpre-installation file
+      if [[ ! -z "$UNPRE_PATH" ]]; then
+        if [[ ! -f /$UNPRE_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 68 "0503-862 %s: installp unpre_i/u script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$UNPRE_PATH" "$TEMPLATE_FILE"`
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            UNPRE_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unpre_i
+          else
+            UNPRE_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unpre_u
+          fi
+          cp $UNPRE_PATH $UNPRE_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid post-installation file
+      if [[ ! -z "$POST_PATH" ]]; then
+        if [[ ! -f /$POST_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 69 "0503-863 %s: installp post_i script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$POST_PATH" "$TEMPLATE_FILE"`
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            POST_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.post_i
+          else
+            POST_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.post_u
+          fi
+          cp $POST_PATH $POST_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid unpost-installation file
+      if [[ ! -z "$UNPOST_PATH" ]]; then
+        if [[ ! -f /$UNPOST_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 70 "0503-864 %s: installp unpost_i script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$UNPOST_PATH" "$TEMPLATE_FILE"`
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            UNPOST_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unpost_i
+          else
+            UNPOST_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unpost_u
+          fi
+          cp $UNPOST_PATH $UNPOST_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid pre_rm file
+      if [[ ! -z "$PRERM_PATH" ]]; then
+        if [[ ! -f /$PRERM_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 91 "0503-883 %s: installp pre_rm script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$PRERM_PATH" "$TEMPLATE_FILE"`
+          print >&2 "$MESG"
+          exit 1;
+        else
+          PRERM_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.pre_rm
+          cp $PRERM_PATH $PRERM_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid configuration file
+      if [[ ! -z "$CONFIG_PATH" ]]; then
+        if [[ ! -f /$CONFIG_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 71 "0503-865 %s: installp config script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$CONFIG_PATH" "$TEMPLATE_FILE"` 
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            CONFIG_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.config
+          else
+            CONFIG_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.config_u
+          fi
+          cp $CONFIG_PATH $CONFIG_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid unconfiguration file
+      if [[ ! -z "$UNCONFIG_PATH" ]]; then
+        if [[ ! -f /$UNCONFIG_PATH ]]; then
+          MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 72 "0503-866 %s: installp unconfig script not found (%s)\n \
+\tin %s\n" "$CMDNAME" "$UNCONFIG_PATH" "$TEMPLATE_FILE"` 
+          print >&2 "$MESG"
+          exit 1;
+        else
+          is_YorN "$UPDATE"
+          if [[ $? -eq 0 ]]; then
+            UNCONFIG_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unconfig
+          else
+            UNCONFIG_FILE=$CONTROL_FILE_DIR/$FILESET_NAME.unconfig_u
+          fi
+          cp $UNCONFIG_PATH $UNCONFIG_FILE
+        fi
+      fi
+
+      # Make sure we've got a valid bosboot flag for this fileset
+      is_YorN "$BOSBOOT"
+      RC=$?
+      if [[ $RC -eq 1 ]]; then
+        BOSBOOT_FLAG="b"
+      elif [[ $RC -eq 0 ]]; then
+        BOSBOOT_FLAG="N"
+      else
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 73 "0503-867 %s: Invalid Bosboot value (%s)\n \
+\tin %s\n" "$CMDNAME" "$BOSBOOT" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+
+      is_YorN "$LIC_REQUIRED"
+      if [[ $? -eq 2 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 74 "0503-868 %s: Invalid LIC_REQUIRED value (%s)\n \
+\tin %s\n" "$CMDNAME" "$LIC_REQUIRED" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi  
+
+      is_YorN "$LIC_REQUIRED"
+      if [[ $? -eq 1 ]]; then
+        if [[ ! -z "$LAR" ]]; then 
+          if [[ (-z ${LAR#LAR*}) || (! -z ${LAR%%LAR*}) ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 75 "0503-869 %s: Invalid LAR value (%s)\n \
+\tin %s\n" "$CMDNAME" "${LAR#LAR*}" "$TEMPLATE_FILE"` 
+            print >&2 "$MESG"
+            exit 1;
+          fi
+        fi
+      fi
+
+      # Make sure we've got a valid license file
+      is_YorN "$LIC_INCLUDED"
+      if [[ $? -eq 2 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 76 "0503-870 %s: Invalid LIC_INCLUDED value (%s)\n \
+\tin %s\n" "$CMDNAME" "$LIC_INCLUDED" "$TEMPLATE_FILE"`
+        print >&2 "$MESG"
+        exit 1;
+      fi
+
+      is_YorN "$LIC_INCLUDED"
+      if [[ $? -eq 1 ]]; then
+        if [[ !  -z "$LAF" ]]; then
+          LAF_SINGLE=${LAF%%;*}
+          LAF_REMAINING=${LAF#*;}
+	  if (( ${#LAF_SINGLE} == ${#LAF_REMAINING} )) then LAF_REMAINING=""; fi
+          while [[ ! -z $LAF_SINGLE ]]; do
+            if [[ (! -z ${LAF_SINGLE%%LAF*}) || \
+                  ((! -f $ROOT_DIR/${LAF_SINGLE#LAF*}) && \
+                   (! -f $ROOT_DIR/${LAF_SINGLE#LAF\<??_??\>*})) ]]; then
+              MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 77 "0503-871 %s: Invalid LAF value (%s)\n \
+\tin %s\n" "$CMDNAME" "${LAF_SINGLE#LAF*}" "$TEMPLATE_FILE"` 
+              print >&2 "$MESG"
+              exit 1;
+            fi
+            LAF_SINGLE=${LAF_REMAINING%%;*}
+            LAF_REMAINING=${LAF_REMAINING#*;}
+	    if (( ${#LAF_SINGLE} == ${#LAF_REMAINING} )) then LAF_REMAINING=""; fi
+          done
+        fi
+      fi
+
+      # Make sure we've got a valid requisites
+      if [[ ! -z "$REQUISITES" ]]; then
+        REQ_SINGLE=${REQUISITES%%;*}
+        REQ_REMAINING=${REQUISITES#*;}
+        if [[ -z ${REQUISITES%%/*} ]]; then  # Requisite file
+          if [[ ! -f "$REQUISITES" || ! -r "$REQUISITES" ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 106 "0503-889 %s: Invalid Requisite file (%s)\n \
+\tin %s\n" "$CMDNAME" "$REQUISITES" "$TEMPLATE_FILE"`
+            print >&2 "$MESG"
+            exit 1;
+          fi
+          # Copy the requisite file to the .info dir
+          cp $REQUISITES $CONTROL_FILE_DIR/$FILESET_NAME.prereq
+          REQUISITES="*.info/$FILESET_NAME.prereq"
+          REQ_SINGLE=""
+        fi
+	if (( ${#REQ_SINGLE} == ${#REQ_REMAINING} )) then REQ_REMAINING=""; fi
+        while [[ ! -z "$REQ_SINGLE" ]]; do
+          REQ_TYPE=${REQ_SINGLE%%[ ]*}
+          if [[ $REQ_TYPE != "*coreq" && $REQ_TYPE != "*ifreq" && $REQ_TYPE != "*instreq" && $REQ_TYPE != "*prereq" ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 78 "0503-872 %s: Invalid Requisite Type (%s)\n \
+\tin %s\n" "$CMDNAME" "$REQ_TYPE" "$TEMPLATE_FILE"`
+            print >&2 "$MESG"
+            exit 1;
+          fi
+
+          REQ_SINGLE=${REQ_SINGLE#*[ ]}
+
+          REQ_NAME=${REQ_SINGLE%%[ ]*}
+          if [[ -z "$REQ_NAME" ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 79 "0503-873 %s: Invalid Requisite Name (%s)\n \
+\tin %s\n" "$CMDNAME" "$REQ_NAME" "$TEMPLATE_FILE"` 
+            print >&2 "$MESG"
+            exit 1;
+          fi
+
+          REQ_VRMF=${REQ_SINGLE#*[ ]}
+          if [[ -z "$REQ_VRMF" ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 80 "0503-874 %s: Invalid Requisite VRMF (%s)\n \
+\tin %s\n" "$CMDNAME" "$REQ_VRMF" "$TEMPLATE_FILE"` 
+            print >&2 "$MESG"
+            exit 1;
+          fi
+
+          # Make sure we've got correct VRMF value
+          case $REQ_VRMF in
+            +([0-9]).+([0-9]).+([0-9]).+([0-9]) ) ;;
+                                               *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 81 \
+                                                  "0503-875 %s: Invalid REQ_VRMF (%s)\n \
+                                                  \tin %s\n" "$CMDNAME" "$REQ_VRMF" "$TEMPLATE_FILE"` 
+                                                  print >&2 "$MESG"
+                                                  exit 1;;
+          esac
+
+          REQ_SINGLE=${REQ_REMAINING%%;*}
+          REQ_REMAINING=${REQ_REMAINING#*;}
+	  if (( ${#REQ_SINGLE} == ${#REQ_REMAINING} )) then REQ_REMAINING=""; fi
+        done
+      fi
+
+      # Make sure we've got a valid ROOT Part answer
+      is_YorN "$CREATE_ROOT"
+      RC=$?
+      if [[ $RC -eq 1 ]]; then
+        touch $CONTROL_FILE_DIR/.create_root
+      elif [[ $RC -eq 2 ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 94 "Invalid ROOT Part value (%s)\n \
+\tin %s\n" "$CREATE_ROOT" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+
+      # If our file already exists, just update it with this fileset's info.
+      #  Otherwise, it's our first time, so also include the package info.
+      #  Also strip out the leading spaces if they appear.
+      if [[ -f $LIST_FILE ]]; then
+        cat >> $LIST_FILE << EOF
+${FILESET_NAME#[ ]*}:${FILESET_VRMF#[ ]*}:${FILESET_DESC#[ ]*}:${BOSBOOT_FLAG#[ ]*}
+${LAF#[ ]*}
+${LAR#[ ]*}
+${REQUISITES#[ ]*}
+EOF
+      else
+        cat > $LIST_FILE << EOF
+${PACKAGE_NAME#[ ]*}:${PACKAGE_VRMF#[ ]*}:${UPDATE_FLAG#[ ]*}
+${FILESET_NAME#[ ]*}:${FILESET_VRMF#[ ]*}:${FILESET_DESC#[ ]*}:${BOSBOOT_FLAG#[ ]*}
+${LAF#[ ]*}
+${LAR#[ ]*}
+${REQUISITES#[ ]*}
+EOF
+      fi
+
+      # If the upsize or insize file already exists, just append the 
+      # fileset's information. Otherwise, create the file and include
+      # the directory of the file system needed to increase size and 
+      # the number of 512 byte blocks for each fileset
+      if [[ ! -z "$ADD" ]]; then
+        ADD=${ADD%*[ ]}
+        ADD_SINGLE=${ADD%%;*}
+        ADD_REMAINING=${ADD#*;}
+        if (( ${#ADD_SINGLE} == ${#ADD_REMAINING} )) then ADD_REMAINING=""; fi
+        while [[ ! -z "$ADD_SINGLE" ]]; do
+          ADD_PATH=${ADD_SINGLE%[ ]*}
+          if [[ -z "$ADD_PATH" ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 82 "0503-876 %s: Invalid In/Upsize path (%s)\n \
+\tin %s\n" "$CMDNAME" "$ADD_PATH" "$TEMPLATE_FILE"` 
+            print >&2 "$MESG"
+            exit 1;
+          fi
+
+          ADD_SPACE=${ADD_SINGLE##*[ ]}
+          # Make sure ADD_SPACE is a number
+          is_numeric "$ADD_SPACE"
+          if [[ $? -ne 1 ]]; then
+            MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 83 "0503-877 %s: Invalid In/Upsize (%s)\n \
+\tin %s\n" "$CMDNAME" "$ADD_SPACE" "$TEMPLATE_FILE"` 
+            print >&2 "$MESG"
+            exit 1
+          else
+            cat >> $SIZE_FILE << EOF
+$ADD_PATH $ADD_SPACE
+EOF
+            ADD_SINGLE=${ADD_REMAINING#[ ]*}
+            ADD_REMAINING=${ADD_SINGLE#*;}
+            ADD_SINGLE=${ADD_SINGLE%%;*}
+            if (( ${#ADD_SINGLE} == ${#ADD_REMAINING} )) then ADD_REMAINING=""; fi
+          fi
+        done
+      fi 
+
+      return
+    else
+      FILESET_KEYWORD=${FILESET_LINE%%:*}              # Get keyword
+      REST_FILESET_LINE=${FILESET_LINE#*:}             # Get everything else
+
+      # Ignore blank lines and comments
+      if [[ ! -z "$PKG_KEYWORD" && "$PKG_KEYWORD" != \#* ]]; then
+        case $FILESET_KEYWORD in
+          "Fileset Name"         )      FILESET_NAME=${REST_FILESET_LINE#[ ]*}  ;;
+          "Fileset VRMF"         )      FILESET_VRMF=${REST_FILESET_LINE#[ ]*}  ;;
+          "Fileset Description"  )      FILESET_DESC=${REST_FILESET_LINE#[ ]*}  ;;
+          "Pre_rm Script"        )      PRERM_PATH=${REST_FILESET_LINE#[ ]*}    ;;
+          "Pre-installation Script" )   PRE_PATH=${REST_FILESET_LINE#[ ]*}      ;;
+          "Unpre-installation Script" ) UNPRE_PATH=${REST_FILESET_LINE#[ ]*}    ;;
+          "Post-installation Script")   POST_PATH=${REST_FILESET_LINE#[ ]*}     ;;
+          "Unpost-installation Script") UNPOST_PATH=${REST_FILESET_LINE#[ ]*}   ;;
+          "Configuration Script")       CONFIG_PATH=${REST_FILESET_LINE#[ ]*}   ;;
+          "Unconfiguration Script")     UNCONFIG_PATH=${REST_FILESET_LINE#[ ]*} ;; 
+          "Bosboot required"     )      BOSBOOT=${REST_FILESET_LINE#[ ]*}       ;;
+          "License agreement acceptance required"  )
+                                        LIC_REQUIRED=${REST_FILESET_LINE#[ ]*}  ;;
+          "Name of license agreement" )
+                                        LAR=${REST_FILESET_LINE#[ ]*}           ;;
+          "Include license files in this package"  )
+                                        LIC_INCLUDED=${REST_FILESET_LINE#[ ]*}  ;;
+          "License file path"    )      LAF=${REST_FILESET_LINE#[ ]*}           ;;
+          "Requisites"           )      REQUISITES=${REST_FILESET_LINE#[ ]*}    ;;
+          "Upsize"               )      ADD=${REST_FILESET_LINE#[ ]*}           ;; 
+          "USRFiles"             )      parse_usr_files                         ;;
+          "ROOT Part"            )      CREATE_ROOT=${REST_FILESET_LINE#[ ]*}    ;;
+          "ROOTFiles"            )      parse_root_files                        ;;
+          *                      )      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 84 \
+                                        "0503-878 %s: Unknown keyword (%s)\n \
+                                        \tin %s\n" "$CMDNAME" "$FILESET_KEYWORD" "$TEMPLATE_FILE"` 
+                                        print "$MESG";;
+        esac
+      fi
+    fi
+  done
+}
+
+
+##############################################################################80
+#                                                                              #
+# parse_usr_files                                                              #
+#  Parse the USR Files section of the template file. Write out our .al file    #
+#  which is a list of files to be packaged for an individual fileset (every    #
+#  fileset has it's own .al file). Display a warning if we don't recognize     #
+#  something in the template file.                                             #
+#                                                                              #
+################################################################################
+parse_usr_files()
+{
+  # Each fileset will have it's own .al file
+  AL_FILE=$CONTROL_FILE_DIR/${FILESET_NAME##*[ ]}.al
+
+  # Write out our info to the .al file until we reach the EOUSRFiles keyword
+  while read FILE_LINE; do
+    if [[ $FILE_LINE != "EOUSRFiles" ]]; then
+      # Make sure we have the filename for our .al file.
+      if [[ -z ${FILE_LINE#[ ]*} ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 85 "0503-879 %s: A blank filename was found\n \
+\tin %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+    
+      # Warn usrs if the files they entered is a part of the system file
+      if [[ -z ${FILE_LINE%%/*} ]]; then
+        lslpp -w ${FILE_LINE#[ ]*} >/dev/null
+      else
+        lslpp -w /${FILE_LINE#[ ]*} >/dev/null
+      fi
+      if [[ ($? -eq 0) && (! -d /${FILE_LINE#[ ]*}) && (! -L /${FILE_LINE#[ ]*}) ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 86 "0503-880 %s: Warning: %s exists in another fileset on the system.\n" \
+             "$CMDNAME" "${FILE_LINE#[ ]*}"` 
+        print "$MESG"
+      fi
+      
+      # Make sure we have a valid file
+      if [[ ! -e $ROOT_DIR/${FILE_LINE#[ ]*} ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 87 "0503-881 %s: Invalid filename (%s)\n \
+\tin %s\n" "$CMDNAME" "${FILE_LINE#[ ]*}" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi      
+
+      # Write out the al file, stripping leading spaces if they appear. Note
+      #  that the file paths are relative, so prepend a dot to the filename.
+      cat >> $AL_FILE << EOF
+.${FILE_LINE#[ ]*}
+EOF
+    else
+      return
+    fi
+  done
+}
+
+
+##############################################################################80
+#                                                                              #
+# parse_root_files                                                             #
+#  Parse the ROOT Files section of the template file. Write out our .al file   #
+#  which is a list of files to be packaged for an individual fileset (every    #
+#  fileset has it's own .al file). Display a warning if we don't recognize     #
+#  something in the template file.                                             #
+#                                                                              #
+################################################################################
+parse_root_files()
+{
+  # Update the USR part .al and create a ROOT part .al
+  USR_AL_FILE=$CONTROL_FILE_DIR/${FILESET_NAME##*[ ]}.al
+  ROOT_AL_FILE=$CONTROL_FILE_DIR/root/${FILESET_NAME##*[ ]}.al
+  mkdir -p $CONTROL_FILE_DIR/root
+
+  # Write out our info to the .al file until we reach the EOROOTFiles keyword
+  while read FILE_LINE; do
+    if [[ $FILE_LINE != "EOROOTFiles" ]]; then
+      # Make sure we have the filename for our .al file.
+      if [[ -z ${FILE_LINE#[ ]*} ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 85 "0503-879 %s: A blank filename was found\n \
+\tin %s\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi
+    
+      # Warn usrs if the files they entered is a part of the system file
+      if [[ -z ${FILE_LINE%%/*} ]]; then
+        lslpp -w ${FILE_LINE#[ ]*} >/dev/null
+      else
+        lslpp -w /${FILE_LINE#[ ]*} >/dev/null
+      fi
+      if [[ ($? -eq 0) && (! -d /${FILE_LINE#[ ]*}) && (! -L /${FILE_LINE#[ ]*}) ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 86 "0503-880 %s: Warning: %s exists in another fileset on the system.\n" \
+             "$CMDNAME" "${FILE_LINE#[ ]*}"` 
+        print "$MESG"
+      fi
+      
+      # Make sure we have a valid file
+      if [[ ! -e $ROOT_DIR/${FILE_LINE#[ ]*} ]]; then
+        MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 87 "0503-881 %s: Invalid filename (%s)\n \
+\tin %s\n" "$CMDNAME" "${FILE_LINE#[ ]*}" "$TEMPLATE_FILE"` 
+        print >&2 "$MESG"
+        exit 1;
+      fi      
+
+      # Write out the al file, stripping leading spaces if they appear. Note
+      #  that the file paths are relative, so prepend a dot to the filename.
+      #  Also copy any root part files to an inst_root dir structure.
+      INST_ROOT_FILE=
+      is_YorN "$UPDATE"
+      if [[ $? -eq 0 ]]; then
+        INST_ROOT_FILE="./usr/lpp/${PACKAGE_NAME##*[ ]}/inst_root${FILE_LINE#[ ]*}"
+      else
+        INST_ROOT_FILE="./usr/lpp/${PACKAGE_NAME##*[ ]}/${FILESET_NAME##*[ ]}/${FILESET_VRMF##*[ ]}/inst_root${FILE_LINE#[ ]*}"
+      fi
+
+      # Make sure they wanted a ROOT part before actually writing out this stuff.
+      is_YorN "$CREATE_ROOT"
+      if [[ $? -eq 1 ]]; then
+        if [[ ! -d ".${FILE_LINE##*[ ]}" ]]; then
+          mkdir -p `dirname "$INST_ROOT_FILE"`
+          cp .${FILE_LINE##*[ ]} `dirname "$INST_ROOT_FILE"`
+        fi
+        cat >> $USR_AL_FILE << EOF
+$INST_ROOT_FILE
+EOF
+        cat >> $ROOT_AL_FILE << EOF
+.${FILE_LINE##*[ ]}
+EOF
+      fi
+    else
+      return
+    fi
+  done
+}
+
+
+##############################################################################80
+#                                                                              #
+# Main Script Execution Begins Here                                            #
+#                                                                              #
+################################################################################
+CMDNAME="mkinstallp"
+
+# Process command line args
+if (( $# > 4 )); then
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 1 "0503-841 %s: usage: \n\
+\t%s [-d BaseDirectory] [-T TemplateFile] \n" "$CMDNAME" "$CMDNAME"` 
+  print >&2 "$MESG"
+  exit 1;
+fi
+
+while (( $# > 0 )); do
+  # Make sure we have enough args
+  if (( $# % 2 != 0 )); then
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 1 "0503-841 %s: usage: \n\
+\t%s [-d BaseDirectory] [-T TemplateFile] \n" "$CMDNAME" "$CMDNAME"`
+    print >&2 "$MESG"
+    exit 1;
+  fi
+
+  case "$1" in
+    -d) ROOT_DIR="$2"; shift;;
+    -T) TEMPLATE_FILE="$2"; shift;;
+     *) MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 1 "0503-841 %s: usage: \n\
+\t%s [-d BaseDirectory] [-T TemplateFile] \n" "$CMDNAME" "$CMDNAME"`
+        print >&2 "$MESG"
+        exit 1;;
+  esac
+  shift
+done
+
+# Set our root build dir as pwd if we didn't get one from the command line
+if [[ -z "$ROOT_DIR" ]]; then
+  ROOT_DIR="$PWD"
+fi
+
+# Set control file directory (stores template, al files, inventory files, and list file)
+CONTROL_FILE_DIR=$ROOT_DIR/.info
+
+# Print status messages based on our build environment
+if [[ -d $ROOT_DIR ]]; then
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 2 \
+       "Using %s as the base package directory. \n" "$ROOT_DIR"`
+  print "$MESG"
+  if [[ ! -d $CONTROL_FILE_DIR ]]; then
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 3 \
+         "Cannot find %s. Attempting to create. \n" "$CONTROL_FILE_DIR"`
+    print "$MESG"
+    mkdir $CONTROL_FILE_DIR
+  fi
+
+  # Check if our mkdir worked
+  if [[ -d $CONTROL_FILE_DIR ]]; then
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 4 \
+         "Using %s to store package control files. \n" "$CONTROL_FILE_DIR"`
+    print "$MESG"
+
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 5 \
+         "Cleaning intermediate files from %s. \n" "$CONTROL_FILE_DIR"`
+    print "$MESG"
+
+    rm -f $CONTROL_FILE_DIR/list
+    rm -f $CONTROL_FILE_DIR/.create_root
+    rm -f $CONTROL_FILE_DIR/*.al
+    rm -f $CONTROL_FILE_DIR/*.config*
+    rm -f $CONTROL_FILE_DIR/*.insize
+    rm -f $CONTROL_FILE_DIR/*.inventory
+    rm -f $CONTROL_FILE_DIR/*.pre_[!d]*
+    rm -f $CONTROL_FILE_DIR/*.post_*
+    rm -f $CONTROL_FILE_DIR/*.size
+    rm -f $CONTROL_FILE_DIR/*.unconfig*
+    rm -f $CONTROL_FILE_DIR/*.unpre_*
+    rm -f $CONTROL_FILE_DIR/*.unpost_*
+    rm -f $CONTROL_FILE_DIR/*.upsize
+    rm -f $CONTROL_FILE_DIR/root/*.al
+    rm -f $CONTROL_FILE_DIR/root/*.config*
+    rm -f $CONTROL_FILE_DIR/root/*.insize
+    rm -f $CONTROL_FILE_DIR/root/*.inventory
+    rm -f $CONTROL_FILE_DIR/root/*.pre_[!d]*
+    rm -f $CONTROL_FILE_DIR/root/*.post_*
+    rm -f $CONTROL_FILE_DIR/root/*.size
+    rm -f $CONTROL_FILE_DIR/root/*.unconfig*
+    rm -f $CONTROL_FILE_DIR/root/*.unpre_*
+    rm -f $CONTROL_FILE_DIR/root/*.unpost_*
+    rm -f $CONTROL_FILE_DIR/root/*.upsize
+  else
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 6 \
+         "0503-842 %s: %s creation failed. \n" "$CMDNAME" "$CONTROL_FILE_DIR"`
+    print >&2 "$MESG"
+    exit 1;
+  fi
+else
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 7 \
+       "0503-843 %s: Base package directory %s does not exist. \n" "$CMDNAME" "$ROOT_DIR"`
+  print >&2 "$MESG"
+  exit 1;
+fi
+
+# Create a new template file if we didn't get one from the command line
+if [[ -z "$TEMPLATE_FILE" ]]; then
+  print "\n************************************************************"
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 8 \
+       "|            Beginning interactive package input           | \n"`
+  print "$MESG"
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 9 \
+       "|   * - required; () - example value; [] - default value   | \n"`
+  print "$MESG"
+  print "************************************************************\n"
+
+  while [[ -z "$PACKAGE_NAME" ]]; do
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 10 "* Package Name (xyz.net) []: \n"`
+    read PACKAGE_NAME?"$MESG"
+  done
+
+  # Set our template filename based on the package name
+  TEMPLATE_FILE=$CONTROL_FILE_DIR/$PACKAGE_NAME.template  
+
+  # Make sure the template file doesn't already exist.
+  if [[ -f $TEMPLATE_FILE ]]; then
+    MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 11 "0503-844 %s: Cannot overwrite existing \n\
+\t%s file.\n " "$CMDNAME" "$TEMPLATE_FILE"`
+    print >&2 "$MESG"
+    exit 1;
+  else
+    # Make sure we can create our template file; we don't want users to enter
+    # all their package info only to find out the template file cannot be created.
+    MESG="Package Name: $PACKAGE_NAME"
+    print "$MESG" > $TEMPLATE_FILE
+    if [[ ! -f $TEMPLATE_FILE ]]; then
+      MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 12 \
+           "0503-845 %s: %s creation failed.\n" "$CMDNAME" "$TEMPLATE_FILE"` 
+      print >&2 "$MESG"
+      exit 1;
+    fi
+  fi
+
+  # Get package data and make a tempalte file
+  create_template
+fi
+
+# By now we should have a good template file. Parse it to get everything ready to
+# exec the makebff script.
+if [[ -f $TEMPLATE_FILE ]]; then
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 57 \
+       "\nUsing %s as the template file.\n" "$TEMPLATE_FILE"`
+  print "$MESG"
+  parse_template < $TEMPLATE_FILE
+else
+  MESG=`/usr/bin/dspmsg -s 20 cmdinstl_e.cat 88 \
+       "0503-882 %s: Template file %s does not exist.\n" "$CMDNAME" "$TEMPLATE_FILE"`
+  print >&2 "$MESG"
+  exit 1;
+fi
+
+# Change to our root package build directory, and execute makebff
+cd "$ROOT_DIR"
+exec makebff.pl
+cd -
