@@ -2,7 +2,8 @@ bin_PROGRAMS=op
 op_SOURCES=defs.h lex.l main.c regexp.c regexp.h util.c \
 	snprintf.c strlcat.c strlcpy.c yywrap.c
 man_MANS=op.1
-EXTRA_DIST=op.conf op.conf.complex op.list.in op.pam op.paper op.1 op.conf-dist
+EXTRA_DIST=op.conf op.conf.complex op.list.in op.pam op.paper op.1 \
+	op.conf-dist autogen.sh contrib
 #README
 
 EXTRA_WARN = @EXTRA_WARN@
