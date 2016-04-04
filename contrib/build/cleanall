@@ -1,0 +1,8 @@
+home=$HOME
+
+set -e
+cd $home/op
+rm -rf build autom4te.cache
+sudo rm -rf contrib/aix??/op/op/build contrib/aix??/op/op/op.template
+rm -rf contrib/hpux????/usr
+rm -rf contrib/solaris/RATPop contrib/solaris/usr
