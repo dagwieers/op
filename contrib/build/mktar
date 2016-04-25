@@ -3,4 +3,4 @@ rdir=/home/ftp/diffusion/exploitation/op
 vers=1.33
 
 ssh -o LogLevel=ERROR ${rhost} \
-"cd ${rdir} && /usr/local/bin/tar zcf ${rdir}/op_${vers}.tar.gz *.rpm *.depot *.bff *.pkg *.admin"
+"cd ${rdir} && /usr/local/bin/tar zcf ${rdir}/op_${vers}.tar.gz *${vers}*.rpm *${vers}*.depot *${vers}*.bff *${vers}*.pkg *.admin"
