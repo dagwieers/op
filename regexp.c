@@ -17,6 +17,7 @@
  *
  *	3. Altered versions must be plainly marked as such, and must not
  *		be misrepresented as being the original software.
+ *
  *** THIS IS AN ALTERED VERSION.  It was altered by John Gilmore,
  *** hoptoad!gnu, on 27 Dec 1986, to add \n as an alternative to |
  *** to assist in implementing egrep.
@@ -41,6 +42,11 @@
  * precedence is structured in regular expressions.  Serious changes in
  * regular-expression syntax might require a total rethink.
  */
+
+#include "config.h"
+
+#ifndef HAVE_REGEX
+
 #include "regexp.h"
 #include <stdio.h>
 #include <ctype.h>
@@ -191,8 +197,8 @@ STATIC void regc(int b);
 STATIC void reginsert(char op, char *opnd);
 STATIC void regtail(char *p, char *val);
 STATIC void regoptail(char *p, char *val);
-#ifdef STRCSPN
-STATIC int strcspn();
+#ifdef WANT_STRCSPN
+STATIC int strcspn(char *s1, char *s2);
 #endif
 
 /*
@@ -777,10 +783,10 @@ STATIC int regtry(regexp * prog, char *string);
 STATIC int regmatch(char *prog);
 STATIC int regrepeat(char *p);
 
-#ifdef DEBUG
+#ifdef WANT_REGDUMP
 int regnarrate = 0;
-void regdump();
-STATIC char *regprop();
+STATIC char *regprop(regexp *r);
+STATIC char *regprop(char *op);
 #endif
 
 /*
@@ -843,8 +849,7 @@ int regexec(register regexp * prog, register char *string)
 /*
  - regtry - try match at specific point
  */
-static int /* 0 failure, 1 success */ regtry(
-						regexp * prog, char *string)
+static int /* 0 failure, 1 success */ regtry(regexp * prog, char *string)
 {
     register int i;
     register char **sp;
@@ -884,12 +889,12 @@ static int /* 0 failure, 1 success */ regmatch(char *prog)
     char *next;			/* Next node. */
 
     scan = prog;
-#ifdef DEBUG
+#ifdef WANT_REGDUMP
     if (scan != NULL && regnarrate)
 	fprintf(stderr, "%s(\n", regprop(scan));
 #endif
     while (scan != NULL) {
-#ifdef DEBUG
+#ifdef WANT_REGDUMP
 	if (regnarrate)
 	    fprintf(stderr, "%s...\n", regprop(scan));
 #endif
@@ -1141,9 +1146,7 @@ static char *regnext(register char *p)
 	return (p + offset);
 }
 
-#ifdef DEBUG
-
-STATIC char *regprop();
+#ifdef WANT_REGDUMP
 
 /*
  - regdump - dump a regexp onto stdout in vaguely comprehensible form
@@ -1279,7 +1282,7 @@ static char *regprop(char *op)
 	strlcat(buf, p, sizeof(buf));
     return (buf);
 }
-#endif
+#endif /* WANT_REGDUMP */
 
 /*
  * The following is provided for those people who do not have strcspn() in
@@ -1287,7 +1290,7 @@ static char *regprop(char *op)
  * about it; at least one public-domain implementation of those (highly
  * useful) string routines has been published on Usenet.
  */
-#ifdef STRCSPN
+#ifdef WANT_STRCSPN
 /*
  * strcspn - find length of initial segment of s1 consisting entirely
  * of characters not from s2
@@ -1308,7 +1311,16 @@ static int strcspn(char *s1, char *s2)
     }
     return (count);
 }
-#endif
+#endif /* WANT_STRCSPN */
+
+#ifdef WANT_REGERROR
+void regerror(char *s)
+{
+    fprintf(stderr, "regerror: %s\n", s);
+}
+#endif /* WANT_REGERROR */
+
+#ifdef WANT_REGSUB
 /*
  * regsub
  *
@@ -1372,7 +1384,8 @@ char *dest;
 	    if (c == '\\' && (*src == '\\' || *src == '&'))
 		c = *src++;
 	    *dst++ = c;
-	} else if (prog->startp[no] != NULL && prog->endp[no] != NULL) {
+	} else if (prog->startp[no] != NULL && prog->endp[no] != NULL &&
+		   prog->endp[no] > prog->startp[no]) {
 	    len = prog->endp[no] - prog->startp[no];
 	    /* Flawfinder: ignore (strncpy) */
 	    strncpy(dst, prog->startp[no], len);
@@ -1385,3 +1398,6 @@ char *dest;
     }
     *dst++ = '\0';
 }
+#endif /* WANT_REGSUB */
+
+#endif /* HAVE_REGEX */
