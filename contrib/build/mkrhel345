@@ -1,6 +1,6 @@
 home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
-vers=1.32
+vers=1.33
 dist=.el$(tr -dc 0-9 < /etc/redhat-release | cut -c 1)
 type xauth | grep -q X11 && x11='--with x11' || x11=
 
@@ -9,8 +9,14 @@ for pkg in rpm-build gcc glibc-devel; do
 	rpm -q $pkg > /dev/null ||
 	sudo yum install -y $pkg
 done
-grep .q %_topdir ~/.rpmmacros ||
-echo %_topdir $home/rpmbuild > ~/.rpmmacros
+grep -q %_topdir ~/.rpmmacros ||
+echo %_topdir $home/rpmbuild >> ~/.rpmmacros
+case $dist in *[45]) # bug cross compile
+     grep -q %_sysconfdir ~/.rpmmacros ||
+     echo %_sysconfdir /etc >> ~/.rpmmacros
+     grep -q %_localstatedir ~/.rpmmacros ||
+     echo %_localstatedir /var >> ~/.rpmmacros
+esac
 cd $home/op
 mkdir -p $home/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SPRMS} packages
 ln -fs $PWD/op-$vers.tar.gz $home/rpmbuild/SOURCES/
