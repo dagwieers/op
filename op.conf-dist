@@ -21,7 +21,7 @@
 
 ## List of privileged users
 
-GRP_PRIVALL=root|wheel|expl|prvall
+GRP_PRIVALL=root|wheel|expl|keypriv
 
 DEFAULT	$COLORS $DISPLAY $HOSTNAME $HISTSIZE $INPUTRC $KDEDIR $LS_COLORS
 	$MAIL $PS1 $PS2 $QTDIR $USERNAME $LANG $LC_ADDRESS $LC_CTYPE
