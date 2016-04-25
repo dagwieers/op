@@ -1992,34 +1992,35 @@ char *yytext;
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdarg.h>
-#include <ctype.h>
-#include <syslog.h>
 #include "defs.h"
+#include <syslog.h>
 
-#if 0
-#define _msg(x) msg x
-#else
+#ifndef NDEBUG
 #define _msg(x)
+#else
+#define _msg(x) msg x
+static void msg(const char *format, ...);
 #endif
-
-static cmd_t *newcmd();
-char *savestr();
-void addvar(const char *str);
-void preproc(const char *str);
-void preprocerror(const char *str);
+static char *expandvars(const char *instr);
+static void preprocerror(const char *str);
+static void preproc(const char *str);
+static void addvar(const char *str);
 static void addquotedarg(int state, cmd_t * cmd, const char *instr);
 static void addarg(int state, cmd_t * cmd, const char *instr);
+static cmd_t *alloccmd(const char *name);
+static void freecmd(cmd_t * cmd);
+static cmd_t *newcmd(const char *name);
+#ifdef NUNUSED
+static int cmpopts(const char *a, const char *b);
+static void sortopts(cmd_t * cmd);
+#endif
 
 int yyline = 1;
 
 #define YY_NO_INPUT
 
 
-#line 2023 "lex.c"
+#line 2024 "lex.c"
 
 #define INITIAL 0
 #define ARGS 1
@@ -2203,12 +2204,12 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 49 "lex.l"
+#line 50 "lex.l"
 
 	int	state = 0;
 	cmd_t	*cmd = NULL;
 
-#line 2212 "lex.c"
+#line 2213 "lex.c"
 
 	if ( !(yy_init) )
 		{
@@ -2294,75 +2295,75 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 53 "lex.l"
+#line 54 "lex.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 54 "lex.l"
+#line 55 "lex.l"
 { preproc(yytext); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 55 "lex.l"
+#line 56 "lex.l"
 { preprocerror(yytext); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 56 "lex.l"
+#line 57 "lex.l"
 { yyline++; BEGIN 0; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 57 "lex.l"
+#line 58 "lex.l"
 { addvar(yytext); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 58 "lex.l"
+#line 59 "lex.l"
 { cmd = newcmd(yytext);
 				state = strcmp(yytext, "DEFAULT") == 0 ? 1 : 0;
 				BEGIN ARGS; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 61 "lex.l"
+#line 62 "lex.l"
 BEGIN ARGS;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 62 "lex.l"
+#line 63 "lex.l"
 state++;
 	YY_BREAK
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 63 "lex.l"
+#line 64 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 64 "lex.l"
+#line 65 "lex.l"
 addquotedarg(state, cmd, yytext);
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 65 "lex.l"
+#line 66 "lex.l"
 addarg(state, cmd, yytext);
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 66 "lex.l"
+#line 67 "lex.l"
 ;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 67 "lex.l"
+#line 68 "lex.l"
 ECHO;
 	YY_BREAK
-#line 2366 "lex.c"
+#line 2367 "lex.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ARGS):
 	yyterminate();
@@ -3327,7 +3328,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 67 "lex.l"
+#line 68 "lex.l"
 
 
 /* ' for emacs */
@@ -3336,10 +3337,10 @@ void yyfree (void * ptr )
 #include <sys/stat.h>
 #include <string.h>
 
-void
+#ifdef NDEBUG
+static void
 msg(const char *format, ...)
 {
-#if 0
     va_list ap;
     char *s;
 
@@ -3350,12 +3351,10 @@ msg(const char *format, ...)
     vfprintf(stderr, s, ap);
     fputc('\n', stderr);
     va_end(ap);
-#else
-    UNUSED(format);
-#endif
 }
+#endif
 
-char *
+static char *
 expandvars(const char *instr)
 {
     char *str = (char *)malloc(VAR_EXPAND_LEN);
@@ -3377,8 +3376,8 @@ expandvars(const char *instr)
 		/* Flawfinder: ignore (strlen) */
 		size_t l = strlen(var->name);
 
-		if (instr - mark > l)
-		    l = instr - mark;
+		if ((size_t) (instr - mark) > l)
+		    l = (size_t) (instr - mark);
 		if (!strncmp(mark, var->name, l)) {
 		    str[i] = 0;
 		    /* Flawfinder: fix (strcat) */
@@ -3398,14 +3397,14 @@ expandvars(const char *instr)
     return str;
 }
 
-void
+static void
 preprocerror(const char *str)
 {
     fprintf(stderr, "Invalid preprocessor command '%s'\n", str);
     exit(1);
 }
 
-void
+static void
 preproc(const char *str)
 {
     if (!strncmp(str, "%if", 3)) {
@@ -3416,7 +3415,7 @@ preproc(const char *str)
 	preprocerror(str);
 }
 
-void
+static void
 addvar(const char *str)
 {
     /* Flawfinder: ignore (char) */
@@ -3431,7 +3430,8 @@ addvar(const char *str)
 	/* Flawfinder: fix (strncpy) */
 	strlcpy(name, str, MIN((size_t) (eq - str + 1), sizeof(name)));
 
-	for (o = 0, i = eq - str + 1; o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
+	for (o = 0, i = (size_t) (eq - str + 1);
+	     o < VAR_EXPAND_LEN - 1 && str[i]; ++i)
 	    if (str[i] == '\\') {
 		switch (str[++i]) {
 		case 'n':
@@ -3471,10 +3471,10 @@ addvar(const char *str)
 	var->next = 0;
 
 	if (Variables) {
-	    var_t *i;
+	    var_t *v;
 
-	    for (i = Variables; i->next; i = i->next) ;
-	    i->next = var;
+	    for (v = Variables; v->next; v = v->next) ;
+	    v->next = var;
 	} else
 	    Variables = var;
     } else
@@ -3502,10 +3502,10 @@ addquotedarg(int state, cmd_t * cmd, const char *instr)
 	    int c = instr[++i];
 
 	    if (strchr("'\"", c)) {
-		buffer[o] = c;
+		buffer[o] = (char)c;
 	    } else {
 		buffer[o++] = '\\';
-		buffer[o] = c;
+		buffer[o] = (char)c;
 	    }
 	} else
 	    buffer[o] = instr[i];
@@ -3546,7 +3546,7 @@ addarg(int state, cmd_t * cmd, const char *instr)
 }
 
 char *
-savestr(char *str)
+savestr(const char *str)
 {
     /* Flawfinder: ignore (strlen) */
     size_t len = strlen(str) + 1;
@@ -3561,7 +3561,7 @@ savestr(char *str)
 }
 
 static cmd_t *
-alloccmd(char *name)
+alloccmd(const char *name)
 {
     cmd_t *cmd = (cmd_t *) malloc(sizeof(cmd_t));
 
@@ -3582,8 +3582,8 @@ alloccmd(char *name)
     return cmd;
 }
 
-void
-freecmd(cmd_t *cmd)
+static void
+freecmd(cmd_t * cmd)
 {
     if (cmd == NULL)
 	return;
@@ -3595,7 +3595,7 @@ freecmd(cmd_t *cmd)
 }
 
 static cmd_t *
-newcmd(char *name)
+newcmd(const char *name)
 {
     cmd_t *cmd = alloccmd(name);
 
@@ -3606,7 +3606,7 @@ newcmd(char *name)
 }
 
 int
-ReadFile(char *file)
+ReadFile(const char *file)
 {
     struct stat statbuf;
     FILE *fd;
@@ -3670,12 +3670,13 @@ CountArgs(cmd_t * cmd)
     }
 
     if (wild)
-	return -max;
-    return max;
+	return (int)-max;
+    return (int)max;
 }
 
+#ifdef NUNUSED
 static int
-cmpopts(char *a, char *b)
+cmpopts(const char *a, const char *b)
 {
     char *cp_a, *cp_b;
     /* NOLINTNEXTLINE(runtime/int) */
@@ -3722,12 +3723,13 @@ cmpopts(char *a, char *b)
     return 0;
 }
 
-void
+static void
 sortopts(cmd_t * cmd)
 {
     qsort(cmd->opts, cmd->nopts, sizeof(char *),
 	  (int(*)(const void *, const void *))cmpopts);
 }
+#endif
 
 /* Build a new command but don't merge it into the global list */
 cmd_t *
@@ -3758,7 +3760,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
 	    /* Flawfinder: fix (strcpy) */
 	    strlcpy(defname, def->opts[i], sizeof(defname));
 	else {
-	    size_t l = cp - def->opts[i];
+	    size_t l = (size_t) (cp - def->opts[i]);
 	    /* Flawfinder: fix (strncpy) */
 	    strlcpy(defname, def->opts[i], MIN(l + 1, sizeof(defname)));
 	}
@@ -3767,7 +3769,7 @@ BuildSingle(cmd_t * def, cmd_t * cmd)
 		/* Flawfinder: fix (strcpy) */
 		strlcpy(optname, cmd->opts[j], sizeof(optname));
 	    else {
-		size_t l = cp - cmd->opts[j];
+		size_t l = (size_t) (cp - cmd->opts[j]);
 		/* Flawfinder: fix (strncpy) */
 		strlcpy(optname, cmd->opts[j], MIN(l + 1, sizeof(optname)));
 	    }
