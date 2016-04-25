@@ -8,6 +8,7 @@ Makefile
 audit/
 autom4te.cache/
 build/
+config.cache
 config.h
 config.log
 config.status
