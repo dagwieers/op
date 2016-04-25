@@ -6789,20 +6789,20 @@ case ".$flag_ok" in #(
      ;; #(
   *) :
 
-if ${CFLAGS+:} false; then :
+if ${EXTRA_CFLAGS+:} false; then :
 
-  case " $CFLAGS " in #(
+  case " $EXTRA_CFLAGS " in #(
   *" -qstackprotect "*) :
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: : CFLAGS already contains -qstackprotect"; } >&5
-  (: CFLAGS already contains -qstackprotect) 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: : EXTRA_CFLAGS already contains -qstackprotect"; } >&5
+  (: EXTRA_CFLAGS already contains -qstackprotect) 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; } ;; #(
   *) :
 
-     as_fn_append CFLAGS " -qstackprotect"
-     { { $as_echo "$as_me:${as_lineno-$LINENO}: : CFLAGS=\"\$CFLAGS\""; } >&5
-  (: CFLAGS="$CFLAGS") 2>&5
+     as_fn_append EXTRA_CFLAGS " -qstackprotect"
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: : EXTRA_CFLAGS=\"\$EXTRA_CFLAGS\""; } >&5
+  (: EXTRA_CFLAGS="$EXTRA_CFLAGS") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }
@@ -6811,9 +6811,9 @@ esac
 
 else
 
-  CFLAGS=-qstackprotect
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: : CFLAGS=\"\$CFLAGS\""; } >&5
-  (: CFLAGS="$CFLAGS") 2>&5
+  EXTRA_CFLAGS=-qstackprotect
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: : EXTRA_CFLAGS=\"\$EXTRA_CFLAGS\""; } >&5
+  (: EXTRA_CFLAGS="$EXTRA_CFLAGS") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }
@@ -6904,15 +6904,6 @@ $as_echo "$ac_cv_path_SED" >&6; }
 if test "_${ax_cv_c_compiler_vendor}" = _gnu; then :
 
 
-# https://www.owasp.org/index.php/C-Based_Toolchain_Hardening
-# http://connect.ed-diamond.com/GNU-Linux-Magazine/GLMFHS-076/Les-options-de-securite-de-gcc
-	# https://wiki.debian.org/Hardening
-# https://wiki.ubuntu.com/ToolChain/CompilerFlags
-	# https://wiki.ubuntu.com/SecurityTeam/KnowledgeBase/BuiltPIE
-	# https://fedoraproject.org/wiki/Security_Features_Matrix
-	# https://fedoraproject.org/wiki/Hardened_Packages
-# https://wiki.gentoo.org/wiki/Hardened/Toolchain
-# https://wiki.archlinux.org/index.php/DeveloperWiki:Security
 
 	if test "_${USE_MAINTAINER_MODE}" = _no; then :
 
