@@ -29,7 +29,8 @@
 
 /* OPENBSD ORIGINAL: lib/libc/string/strlcat.c */
 
-#include "config.h"
+#include "defs.h"
+
 #ifndef HAVE_LIBBSD
 #ifndef HAVE_STRLCAT
 
@@ -53,8 +54,8 @@ size_t strlcat(char *dst, const char *src, size_t siz)
     /* Find the end of dst and adjust bytes left but don't go past end */
     while (n-- != 0 && *d != '\0')
 	d++;
-    dlen = d - dst;
-    n = siz - dlen;
+    dlen = (size_t) (d - dst);
+    n = (size_t) (siz - dlen);
 
     if (n == 0)
 	/* Flawfinder: ignore (strlen) */
@@ -68,7 +69,7 @@ size_t strlcat(char *dst, const char *src, size_t siz)
     }
     *d = '\0';
 
-    return (dlen + (s - src));	/* count does not include NUL */
+    return (dlen + (size_t) (s - src));	/* count does not include NUL */
 }
 
 #endif				/* !HAVE_LIBBSD */
