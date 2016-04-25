@@ -8,24 +8,20 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
-#include <sys/types.h>
+#include "defs.h"
 #include <sys/stat.h>
 #include <errno.h>
+#include <grp.h>
 #include <netdb.h>
+#include <pwd.h>
+#include <signal.h>
+#include <syslog.h>
+#include "rplregex.h"
+
 #ifdef __hpux
 extern int innetgr(__const char *__netgroup, __const char *__host,
 		   __const char *__user, __const char *__domain);
 #endif
-#include <signal.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <syslog.h>
-#include <pwd.h>
-#include <grp.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include "defs.h"
-#include "regexp.h"
 
 #ifdef sun
 #  if defined(__SVR4) || defined(__svr4__)
@@ -43,11 +39,17 @@ extern int innetgr(__const char *__netgroup, __const char *__host,
 
 #ifdef USE_PAM
 #include <security/pam_appl.h>
+
+#  if defined(__hpux) || defined(SOLARIS) || defined(_AIX)
+#    define PAM_CONST
+#  else
+#    define PAM_CONST const
+#  endif
 #endif
 
 #ifdef SECURID
-#include "sdi_athd.h"
-#include "sdconf.h"
+#include <sdi_athd.h>
+#include <sdconf.h>
 union config_record configure;
 #endif
 
@@ -63,48 +65,60 @@ union config_record configure;
 #define	MAXARG	1024
 #define	MAXENV	MAXARG
 
-extern char *savestr();
-/* Flawfinder: ignore */
-extern char *getpass(), *crypt();
+static void Usage(void);
+static int FileCompare(const void *a, const void *b);
+static int SortCommandList(const void *a, const void *b);
+static void ListCommands(void);
+static int ReadDir(const char *dir);
+static cmd_t *Find(const char *name);
+static char *FindOpt(cmd_t * cmd, const char *str);
+static char *GetField(char *cp, char *str, size_t len);
+#ifdef USE_PAM
+static int pam_conversation(int num_msg, PAM_CONST struct pam_message **msg,
+			    struct pam_response **response, void *appdata_ptr);
+#endif
+static int VerifyPermissions(cmd_t * cmd);
+static int Verify(cmd_t * cmd, size_t num, size_t argc, char **argv);
+static char *str_replace(const char *source, size_t offset, size_t length, const char *paste);
+static int Go(cmd_t * cmd, /* UNUSED */ size_t num, size_t argc, char **argv);
+#ifdef NUNUSED
+static void output(cmd_t * cmd);
+#endif
+static char *format_cmd(size_t argc, char **argv, char *retbuf, /* UNUSED */ size_t buflen);
+static int vlogger(unsigned level, const char *format, va_list args);
+static int rpl_reglog(unsigned level, int error, REGEXP_T * const *prog, const char *str);
 
-char *format_cmd(int argc, char **argv, char *retbuf, /* UNUSED */ size_t buflen);
-char *GetCode();
-int Verify(cmd_t * cmd, size_t num, int argc, char **argv);
-int VerifyPermissions(cmd_t * cmd);
-cmd_t *Find(char *name);
-char *FindOpt(cmd_t * cmd, char *str);
-void ListCommands();
-int Go(cmd_t * cmd, /* UNUSED */ size_t num, int argc, char **argv);
 cmd_t *First = NULL;
 var_t *Variables = NULL;
-char *realuser = NULL;
-int gargc = -1;
-char **gargv = NULL;
-sigset_t sig_mask, old_sig_mask;
-unsigned minimum_logging_level = 99;
 
-void
-Usage()
+static char *realuser = NULL;
+static int gargc = -1;
+static char **gargv = NULL;
+static sigset_t sig_mask, old_sig_mask;
+static unsigned minimum_logging_level = 99;
+
+static void
+Usage(void)
 {
     fatal(0, "Usage: %s mnemonic [args]\n"
 	  "       %s -l     List available commands\n"
 	  "       %s -V     Show op version", gargv[0], gargv[0], gargv[0]);
 }
 
-int
+static int
 FileCompare(const void *a, const void *b)
 {
     return strcmp(*(char **)a, *(char **)b);
 }
 
-int
+static int
 SortCommandList(const void *a, const void *b)
 {
     return strcmp((*(cmd_t **) a)->name, (*(cmd_t **) b)->name);
 }
 
-void
-ListCommands()
+static void
+ListCommands(void)
 {
     cmd_t *def, *cmd;
     array_t *cmds = array_alloc();
@@ -157,8 +171,8 @@ ListCommands()
 		    for (j = 1; j < cmd->nargs; ++j) {
 			/* Flawfinder: fix (strcat) */
 			strlcat(help, " ", len);
-			if (strchr(cmd->args[j], ' ')
-			    || strchr(cmd->args[j], '\t')) {
+			if (strchr(cmd->args[j], ' ') ||
+			    strchr(cmd->args[j], '\t')) {
 			    /* Flawfinder: fix (strcat) */
 			    strlcat(help, "'", len);
 			    strlcat(help, cmd->args[j], len);
@@ -181,8 +195,8 @@ ListCommands()
     array_free(cmds);
 }
 
-int
-ReadDir(char *dir)
+static int
+ReadDir(const char *dir)
 {
     DIR *d;
 
@@ -193,11 +207,11 @@ ReadDir(char *dir)
 	array_t *dir_list = array_alloc();
 
 	while ((f = readdir(d))) {
-	    if (f->d_name[0] == '.'
+	    if (f->d_name[0] == '.' ||
 		/* Flawfinder: ignore (strlen) */
-		|| (strlen(f->d_name) > 5
+		(strlen(f->d_name) > 5 &&
 		    /* Flawfinder: ignore (strlen) */
-		    && strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
+		    strcmp(f->d_name + strlen(f->d_name) - 5, ".conf")))
 		continue;
 	    if (!array_push(dir_list, savestr(f->d_name)))
 		fatal(1, "failed to malloc space for directory entry");
@@ -364,14 +378,14 @@ main(int argc, char *argv[])
     /* XXX cppcheck unreadVariable:Variable 'pcmd_s' is assigned
      *     a value that is never used */
     /* pcmd_s = format_cmd(argc, argv, cmd_s, MAXSTRLEN); */
-    if (Verify(new, num, argc, argv) < 0)
+    if (Verify(new, (size_t) num, (size_t) argc, argv) < 0)
 	fatal(0, "%s: permission denied by op", cmd->name);
 
-    return Go(new, num, argc, argv);
+    return Go(new, (size_t) num, (size_t) argc, argv);
 }
 
-cmd_t *
-Find(char *name)
+static cmd_t *
+Find(const char *name)
 {
     cmd_t *cmd;
 
@@ -383,8 +397,8 @@ Find(char *name)
     return cmd;
 }
 
-char *
-FindOpt(cmd_t * cmd, char *str)
+static char *
+FindOpt(cmd_t * cmd, const char *str)
 {
     /* Flawfinder: ignore (char) */
     static char nul[1] = "";
@@ -396,7 +410,7 @@ FindOpt(cmd_t * cmd, char *str)
 	    if (strcmp(cmd->opts[i], str) == 0)
 		return nul;
 	} else {
-	    size_t l = cp - cmd->opts[i];
+	    size_t l = (size_t) (cp - cmd->opts[i]);
 	    if (strncmp(cmd->opts[i], str, l) == 0)
 		return cp + 1;
 	}
@@ -405,7 +419,7 @@ FindOpt(cmd_t * cmd, char *str)
     return NULL;
 }
 
-char *
+static char *
 GetField(char *cp, char *str, size_t len)
 {
     char *end = str + len - 2;
@@ -434,33 +448,35 @@ GetField(char *cp, char *str, size_t len)
 }
 
 #ifdef USE_PAM
-#if defined(__hpux) || defined(SOLARIS) || defined(_AIX)
-#define noconst
-#else
-#define noconst const
-#endif
+
 /* ARGUSED3 */
-int
-pam_conversation(int num_msg, noconst struct pam_message **msg,
+static int
+pam_conversation(int num_msg, PAM_CONST struct pam_message **msg,
 		 struct pam_response **response, void *appdata_ptr)
 {
-    size_t i;
+    int i;
     const struct pam_message *pm;
     struct pam_response *pr;
-    char *pass;
+    char *pass, *cp;
 
     UNUSED(appdata_ptr);
-    if ((*response = malloc(sizeof(struct pam_response) * num_msg)) == NULL)
+    /*
+     * Valeur definie sur les principales distributions Linux
+     * #define PAM_MAX_NUM_MSG 32
+     */
+    if (num_msg <= 0 || num_msg > PAM_MAX_NUM_MSG ||
+	(*response = malloc((size_t) num_msg *
+			    sizeof(struct pam_response))) == NULL)
 	return PAM_CONV_ERR;
-    memset(*response, 0, num_msg * sizeof(struct pam_response));
+    memset(*response, 0, (size_t) num_msg * sizeof(struct pam_response));
 
     for (i = 0, pm = *msg, pr = *response; i < num_msg; ++i, ++pm, ++pr) {
 	switch (pm->msg_style) {
 	case PAM_PROMPT_ECHO_ON:
-	    if (!(pass = malloc(512)))
+	    if (!(pass = malloc(PASS_MAX)))
 		return PAM_CONV_ERR;
 	    puts(pm->msg);
-	    fgets(pass, 512, stdin);
+	    cp = fgets(pass, PASS_MAX, stdin);
 	    pr->resp = pass;
 	    break;
 	case PAM_PROMPT_ECHO_OFF:
@@ -473,12 +489,15 @@ pam_conversation(int num_msg, noconst struct pam_message **msg,
 			free(pr->resp);
 			pr->resp = NULL;
 		    }
-		memset(*response, 0, num_msg * sizeof(struct pam_response));
+		memset(*response, 0, (size_t) num_msg *
+		       sizeof(struct pam_response));
 		free(*response);
 		*response = NULL;
 		return PAM_CONV_ERR;
 	    }
 	    pr->resp = savestr(pass);
+	    /* Flawfinder: ignore (strlen) */
+	    memset(pass, 0, strlen(pass));
 	    break;
 	case PAM_TEXT_INFO:
 	    if (pm->msg)
@@ -498,7 +517,8 @@ pam_conversation(int num_msg, noconst struct pam_message **msg,
 		    free(pr->resp);
 		    pr->resp = NULL;
 		}
-	    memset(*response, 0, num_msg * sizeof(struct pam_response));
+	    memset(*response, 0, (size_t) num_msg *
+		   sizeof(struct pam_response));
 	    free(*response);
 	    *response = NULL;
 	    return PAM_CONV_ERR;
@@ -510,14 +530,14 @@ pam_conversation(int num_msg, noconst struct pam_message **msg,
 
 #endif
 
-int
+static int
 VerifyPermissions(cmd_t * cmd)
 {
-    int gr_fail = 1, uid_fail = 1, netgr_fail = 1;
+    int gr_fail = 1, uid_fail = 1, netgr_fail = 1, rc;
     size_t i;
     /* Flawfinder: ignore (char) */
     char *cp, str[MAXSTRLEN], hostname[HOST_NAME_MAX];
-    regexp *reg1 = NULL;
+    REGEXP_T *reg1 = NULL;
     struct passwd *pw;
     /* cppcheck-suppress variableScope */
     struct group *gr;
@@ -543,16 +563,18 @@ VerifyPermissions(cmd_t * cmd)
 	    strlcat(regstr, str, sizeof(regstr));
 	    strlcat(regstr, ")$", sizeof(regstr));
 
-	    if ((reg1 = regcomp(regstr)) == NULL)
-		return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+	    if ((rc = rpl_regcomp(&reg1, regstr, 0)) != 0)
+		return rpl_reglog(LOG_ERR, rc, &reg1, regstr);
 
 	    if ((gr = getgrgid(pw->pw_gid)) != NULL) {
+		char *errstr;
 		/* Flawfinder: fix (strcpy, strcat) */
 		strlcpy(grouphost, gr->gr_name, sizeof(grouphost));
 		strlcat(grouphost, "@", sizeof(grouphost));
 		strlcat(grouphost, hostname, sizeof(grouphost));
 
-		if (regexec(reg1, gr->gr_name) == 1 || regexec(reg1, grouphost)) {
+		if (rpl_regexec(&reg1, errstr = gr->gr_name) == 0 ||
+		    rpl_regexec(&reg1, errstr = grouphost) == 0) {
 		    gr_fail = 0;
 		    break;
 		}
@@ -570,8 +592,9 @@ VerifyPermissions(cmd_t * cmd)
 		    strlcpy(grouphost, gr->gr_name, sizeof(grouphost));
 		    strlcat(grouphost, "@", sizeof(grouphost));
 		    strlcat(grouphost, hostname, sizeof(grouphost));
-		    if (regexec(reg1, gr->gr_name) == 1
-			|| regexec(reg1, grouphost)) {
+
+		    if (rpl_regexec(&reg1, gr->gr_name) == 0 ||
+			rpl_regexec(&reg1, grouphost) == 0) {
 			gr_fail = 0;
 			break;
 		    }
@@ -579,10 +602,8 @@ VerifyPermissions(cmd_t * cmd)
 	    }
 	}
     }
-    if (reg1 != NULL) {
-	free(reg1);
-	reg1 = NULL;
-    }
+    if (reg1 != NULL)
+	rpl_regfree(&reg1);
 
     if (gr_fail && ((cp = FindOpt(cmd, "users")) != NULL)) {
 	/* Flawfinder: ignore (char) */
@@ -611,10 +632,11 @@ VerifyPermissions(cmd_t * cmd)
 	    strlcat(userhost, "@", sizeof(userhost));
 	    strlcat(userhost, hostname, sizeof(userhost));
 
-	    if ((reg1 = regcomp(regstr)) == NULL)
-		return logger(LOG_ERR, "Invalid regex '%s'", regstr);
+	    if ((rc = rpl_regcomp(&reg1, regstr, 0)) != 0)
+		return rpl_reglog(LOG_ERR, rc, &reg1, regstr);
 
-	    if (regexec(reg1, pw->pw_name) == 1 || regexec(reg1, userhost) == 1) {
+	    if (rpl_regexec(&reg1, pw->pw_name) == 0 ||
+		rpl_regexec(&reg1, userhost) == 0) {
 		/* valid user, check expiry (if any) */
 		if (expirestart) {
 		    ++expirestart;
@@ -646,16 +668,12 @@ VerifyPermissions(cmd_t * cmd)
 	    }
 	}
     }
-    if (reg1 != NULL) {
-	/* cppcheck-suppress doubleFree
-	   Memory pointed to by 'reg1' is freed twice. */
-	free(reg1);
-	reg1 = NULL;
-    }
+    if (reg1 != NULL)
+	rpl_regfree(&reg1);
 
     if (uid_fail && (cp = FindOpt(cmd, "netgroups")) != NULL) {
-	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL && netgr_fail;
-	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
+	for (cp = GetField(cp, str, MAXSTRLEN); cp != NULL && netgr_fail;
+	     cp = GetField(cp, str, MAXSTRLEN)) {
 	    if (innetgr(str, hostname, pw->pw_name, NULL)) {
 		netgr_fail = 0;
 		break;
@@ -668,16 +686,15 @@ VerifyPermissions(cmd_t * cmd)
     return 0;
 }
 
-int
-Verify(cmd_t * cmd, size_t num, int argc, char **argv)
+static int
+Verify(cmd_t * cmd, size_t num, size_t argc, char **argv)
 {
-    size_t i, j;
-    /* NOLINTNEXTLINE(runtime/int) */
-    long val;
+    size_t i, j, val;
+    int rc;
     /* Flawfinder: ignore (char) */
     char *np, *cp, str[MAXSTRLEN], buf[MAXSTRLEN];
-    regexp *reg1 = NULL;
-    regexp *reg2 = NULL;
+    REGEXP_T *reg1 = NULL;
+    REGEXP_T *reg2 = NULL;
     struct passwd *pw;
 #ifdef USE_SHADOW
     struct spwd *spw;
@@ -698,9 +715,8 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 	memset(&sd_dat, 0, sizeof(sd_dat));	/* clear sd_auth struct */
 	sd = &sd_dat;
 	creadcfg();		/*  accesses sdconf.rec  */
-	if (sd_init(sd)) {
+	if (sd_init(sd))
 	    return logger(LOG_WARNING | LOG_PRINT, "Cannot contact ACE server");
-	}
 	if (sd_auth(sd))
 	    return -1;
     }
@@ -719,7 +735,14 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 		return logger(LOG_ERR, "Could not get user password");
 
 	    /* Flawfinder: ignore (crypt) */
-	    if (strcmp(crypt(np, str), str) != 0)
+	    rc = strcmp(crypt(np, str), str);
+
+	    /* Flawfinder: ignore (strlen) */
+	    memset(np, 0, strlen(np));
+	    /* Flawfinder: ignore (strlen) */
+	    memset(str, 0, strlen(str));
+
+	    if (rc != 0)
 		return logger(LOG_ERR, "Incorrect direct password");
 	} else {
 	    int resp;
@@ -730,7 +753,7 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 	    if (resp == PAM_SUCCESS)
 		resp = pam_acct_mgmt(pam, 0);
 	    if (resp != PAM_SUCCESS) {
-		return logger(LOG_ERR, "pam_authticate: %s",
+		return logger(LOG_ERR, "pam_authenticate: %s",
 			      pam_strerror(pam, resp));
 	    }
 	    pam_end(pam, resp);
@@ -742,7 +765,14 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 
 	if ((cp = GetField(cp, str, MAXSTRLEN)) != NULL) {
 	    /* Flawfinder: ignore (crypt) */
-	    if (strcmp(crypt(np, str), str) != 0)
+	    rc = strcmp(crypt(np, str), str);
+
+	    /* Flawfinder: ignore (strlen) */
+	    memset(np, 0, strlen(np));
+	    /* Flawfinder: ignore (strlen) */
+	    memset(str, 0, strlen(str));
+
+	    if (rc != 0)
 		return logger(LOG_ERR, "Incorrect direct password");
 	} else {
 #ifdef USE_SHADOW
@@ -755,7 +785,14 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 #endif
 
 	    /* Flawfinder: ignore (crypt) */
-	    if (!cp && strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd) != 0)
+	    rc = strcmp(crypt(np, pw->pw_passwd), pw->pw_passwd);
+
+	    /* Flawfinder: ignore (strlen) */
+	    memset(np, 0, strlen(np));
+	    /* Flawfinder: ignore (strlen) */
+	    memset(pw->pw_passwd, 0, strlen(pw->pw_passwd));
+
+	    if (rc != 0)
 		return logger(LOG_ERR, "Invalid user password");
 	}
 #endif
@@ -770,8 +807,8 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 		      "Both user, group and netgroup authentication failed");
 
     for (i = 0; i < cmd->nopts; i++) {
-	if ((cmd->opts[i][0] != '$')
-	    || ((cp = strchr(cmd->opts[i], '=')) == NULL))
+	if ((cmd->opts[i][0] != '$') ||
+	    ((cp = strchr(cmd->opts[i], '=')) == NULL))
 	    continue;
 	if (cmd->opts[i][1] != '*') {
 	    for (np = cmd->opts[i] + 1; np != cp; np++)
@@ -795,9 +832,10 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 		    strlcat(regstr, str, sizeof(regstr));
 		    strlcat(regstr, ")$", sizeof(regstr));
 
-		    if ((reg1 = regcomp(regstr)) == NULL)
-			return logger(LOG_ERR, "Invalid regex '%s'", regstr);
-		    if (regexec(reg1, argv[j]) == 1)
+		    if ((rc = rpl_regcomp(&reg1, regstr, 0)) != 0)
+			return rpl_reglog(LOG_ERR, rc, &reg1, regstr);
+
+		    if (rpl_regexec(&reg1, argv[j]) == 0)
 			break;
 		}
 		if (cp == NULL)
@@ -806,10 +844,8 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 				  cmd->name, j, argv[j]);
 	    }
 	}
-	if (reg1 != NULL) {
-	    free(reg1);
-	    reg1 = NULL;
-	}
+	if (reg1 != NULL)
+	    rpl_regfree(&reg1);
 
 	/* Flawfinder: fix (strncpy) */
 	strlcpy(str, cmd->opts[i] + 1,
@@ -819,7 +855,7 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 	    continue;
 
 	/* Flawfinder: fix (atoi -> strtolong) */
-	val = strtolong(str, 10);
+	val = (size_t) strtolong(str, 10);
 
 	if (val >= argc)
 	    continue;
@@ -829,7 +865,7 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 	if (reg2 != NULL) {
 	    for (cp = GetField(cp, str, MAXSTRLEN); cp != NULL;
 		 cp = GetField(cp, str, MAXSTRLEN)) {
-		regsub(reg2, str, buf);
+		rpl_regsub(&reg2, str, buf, sizeof(buf));
 		if (strcmp(buf, argv[val]) == 0)
 		    break;
 	    }
@@ -852,13 +888,11 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 		strlcat(regstr, str, sizeof(regstr));
 		strlcat(regstr, ")$", sizeof(regstr));
 
-		if ((reg2 = regcomp(regstr)) == NULL)
-		    return logger(LOG_ERR, "Invalid regex '%s'", regstr);
-		if (regexec(reg2, argv[val]) == 1)
-		    break;
+		if ((rc = rpl_regcomp(&reg2, regstr, 0)) != 0)
+		    return rpl_reglog(LOG_ERR, rc, &reg2, regstr);
 
-		free(reg2);
-		reg2 = NULL;
+		if (rpl_regexec(&reg2, argv[val]) == 0)
+		    break;
 	    }
 	}
 	if (cp == NULL)
@@ -866,10 +900,12 @@ Verify(cmd_t * cmd, size_t num, int argc, char **argv)
 			  "%s: argument '%s' did not pass constraint '%s'",
 			  cmd->name, argv[val], np);
     }
+    if (reg2 != NULL)
+	rpl_regfree(&reg2);
     return 0;
 }
 
-char *
+static char *
 str_replace(const char *source, size_t offset, size_t length, const char *paste)
 {
     /* Flawfinder: ignore (strlen) */
@@ -888,21 +924,19 @@ str_replace(const char *source, size_t offset, size_t length, const char *paste)
     return buffer;
 }
 
-int
-Go(cmd_t * cmd, size_t num, int argc, char **argv)
+static int
+Go(cmd_t * cmd, size_t num, size_t argc, char **argv)
 {
     extern char **environ;
     /* cppcheck-suppress variableScope */
-    size_t i, j, len;
-    int flag;
-    /* NOLINTNEXTLINE(runtime/int) */
-    long val;
+    size_t i, j, len, val;
+    int flag, rc;
     /* cppcheck-suppress variableScope */
     char *cp, *np;
     struct passwd *pw;
     struct group *gr;
     /* cppcheck-suppress variableScope */
-    int ngroups = 0;
+    size_t ngroups = 0;
     gid_t gidset[NGROUPS_MAX];
     size_t curenv = 0, curarg = 0;
     /* Flawfinder: ignore (char) */
@@ -973,12 +1007,14 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 		char *argv[] =
 		    { XAUTH, "-f", cxauth, "extract", tmpxauth, display, NULL };
 
-		/*      We need to be root to be sure that access to both Xauthority files
-		   will work */
+		/* We need to be root to be sure that access to both Xauthority
+		   files will work */
 		/* Flawfinder: ignore (umask) */
-		umask(077);
-		setuid(currentpw->pw_uid);
-		setgid(currentpw->pw_gid);
+		umask((mode_t)077);
+		if (setuid(currentpw->pw_uid) < 0)
+		    fatal(1, "Unable to set uid to %d", currentpw->pw_uid);
+		if (setgid(currentpw->pw_gid) < 0)
+		    fatal(1, "Unable to set gid to %d", currentpw->pw_gid);
 		/* Flawfinder: ignore (execv) */
 		if (execv(XAUTH, argv) == -1) {
 		    logger(LOG_ERR, "Unable to exec xauth, return code %i",
@@ -1009,9 +1045,11 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 		    fatal(1, "Failed to change ownership of %s", tmpxauth);
 		}
 		/* Flawfinder: ignore (umask) */
-		umask(077);
-		setuid(uid);
-		setgid(gid);
+		umask((mode_t)077);
+		if (setuid(uid) < 0)
+		    fatal(1, "Unable to set uid to %d", uid);
+		if (setgid(gid) < 0)
+		    fatal(1, "Unable to set gid to %d", gid);
 		/* Flawfinder: ignore (execv) */
 		if (execv(XAUTH, argv) == -1) {
 		    logger(LOG_ERR,
@@ -1094,7 +1132,7 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
     }
 
     if ((cp = FindOpt(cmd, "umask")) == NULL) {
-	mode_t m = 0022;
+	mode_t m = (mode_t)0022;
 	/* Flawfinder: ignore (umask) */
 	if (!umask(m) || umask(m) != m) {
 	    fatal(1, "Unable to set umask to default");
@@ -1146,7 +1184,8 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 	    for (j = 0; environ[j] != NULL; j++) {
 		if ((cp = strchr(environ[j], '=')) == NULL)
 		    continue;
-		if (strncmp(cmd->opts[i] + 1, environ[j], cp - environ[j]) == 0) {
+		if (strncmp(cmd->opts[i] + 1, environ[j],
+			    (size_t) (cp - environ[j])) == 0) {
 		    if (curenv + 1 >= MAXENV)
 			fatal(1, "%s: environment length exceeded", cmd->name);
 		    new_envp[curenv++] = environ[j];
@@ -1221,7 +1260,7 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
-	    regexp *reg1 = NULL;
+	    REGEXP_T *reg1 = NULL;
 	    /* Flawfinder: ignore (char) */
 	    char regstr[MAXSTRLEN];
 
@@ -1236,10 +1275,10 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 	    strlcat(regstr, str, sizeof(regstr));
 	    strlcat(regstr, ")$", sizeof(regstr));
 
-	    if ((reg1 = regcomp(regstr)) == NULL)
-		return logger(LOG_ERR, "Invalid regex '%s'", str);
+	    if ((rc = rpl_regcomp(&reg1, regstr, 0)) != 0)
+		return rpl_reglog(LOG_ERR, rc, &reg1, regstr);
 
-	    if ((regexec(reg1, usergroup) == 1))
+	    if (rpl_regexec(&reg1, usergroup) == 0)
 		break;
 	}
 	if (cp == NULL)
@@ -1265,7 +1304,7 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 
 	for (cp = GetField(cp, str, MAXSTRLEN - 5); cp != NULL;
 	     cp = GetField(cp, str, MAXSTRLEN - 5)) {
-	    regexp *reg1 = NULL;
+	    REGEXP_T *reg1 = NULL;
 	    /* Flawfinder: ignore (char) */
 	    char regstr[MAXSTRLEN];
 
@@ -1274,10 +1313,10 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 	    strlcat(regstr, str, sizeof(regstr));
 	    strlcat(regstr, ")$", sizeof(regstr));
 
-	    if ((reg1 = regcomp(regstr)) == NULL)
-		return logger(LOG_ERR, "Invalid regex '%s'", str);
+	    if ((rc = rpl_regcomp(&reg1, regstr, 0)) != 0)
+		return rpl_reglog(LOG_ERR, rc, &reg1, regstr);
 
-	    if (regexec(reg1, mode) == 1)
+	    if (rpl_regexec(&reg1, mode) == 0)
 		break;
 	}
 	if (cp == NULL)
@@ -1301,7 +1340,7 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 	if (argc != 1) {
 	    if (curarg >= MAXARG - 1)
 		fatal(1, "%s: argument length exceeded", cmd->name);
-	    new_argv[curarg++] = "-c";
+	    new_argv[curarg++] = (char *)"-c";
 
 	    len = 0;
 	    for (i = 1; i < argc; i++)
@@ -1339,7 +1378,7 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 			new_argv[curarg++] = argv[j];
 		} else if (isdigit((int)np[1])) {
 		    /* Flawfinder: fix (atoi -> strtolong) */
-		    size_t argi = strtolong(np + 1, 10);
+		    size_t argi = (size_t) strtolong(np + 1, 10);
 
 		    if (argi > argc)
 			fatal(1, "%s Referenced argument out of range",
@@ -1384,8 +1423,9 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 				    strlcat(buffer, " ", len);
 			    }
 			    tmp = str_replace(cmd->args[i],
-					      np - cmd->args[i] - 1,
-					      cp - np + 1, buffer);
+					      (size_t) (np - cmd->args[i] - 1),
+					      (size_t) (cp - np + 1),
+					      buffer);
 			    cp = tmp + (cp - cmd->args[i]);
 			    np = cp;
 			    cmd->args[i] = tmp;
@@ -1395,11 +1435,12 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
 
 			    if (cp != np) {
 				/* Flawfinder: fix (atoi -> strtolong) */
-				val = strtolong(np, 10);
+				val = (size_t) strtolong(np, 10);
 
 				tmp = str_replace(cmd->args[i],
-						  np - cmd->args[i] - 1,
-						  cp - np + 1, argv[val]);
+						  (size_t) (np - cmd->args[i] - 1),
+						  (size_t) (cp - np + 1),
+						  argv[val]);
 				cp = tmp + (cp - cmd->args[i]) + 1;
 				np = cp;
 				cmd->args[i] = tmp;
@@ -1419,21 +1460,22 @@ Go(cmd_t * cmd, size_t num, int argc, char **argv)
     }
     new_argv[curarg] = NULL;
 
-    if (stat(new_argv[0], &st) != -1
-	&& st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+    if (stat(new_argv[0], &st) != -1 &&
+	st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
 	logger(LOG_INFO, "SUCCESS");
 
     if (sigprocmask(SIG_SETMASK, &old_sig_mask, NULL))
 	fatal(1, "could not restore signal mask");
-    if ((i = execve(new_argv[0], new_argv, new_envp)) < 0) {
+    if ((flag = execve(new_argv[0], new_argv, new_envp)) < 0) {
 	perror("execve");
-	logger(LOG_ERR, "execve(3) failed with error code %i", i);
-	exit(i);
+	logger(LOG_ERR, "execve(3) failed with error code %i", flag);
+	exit(flag);
     }
     return 0;
 }
 
-void
+#ifdef NUNUSED
+static void
 output(cmd_t * cmd)
 {
     size_t i;
@@ -1447,9 +1489,10 @@ output(cmd_t * cmd)
 	printf("'%s' ", cmd->opts[i]);
     printf("\n");
 }
+#endif
 
-char *
-format_cmd(int argc, char **argv, char *retbuf, size_t buflen)
+static char *
+format_cmd(size_t argc, char **argv, char *retbuf, size_t buflen)
 /*   
      Format command and args for printing to syslog
      If length (command + args) is too long, try length(command). If THATS
@@ -1474,7 +1517,7 @@ format_cmd(int argc, char **argv, char *retbuf, size_t buflen)
 	s += l;
     }
     if (l)
-	s += argc - 1;		/* count spaces if there are arguments */
+	s += (size_t) (argc - 1);  /* count spaces if there are arguments */
     if (s > MAXSTRLEN) {	/* Ooops, we've gone over. */
 	m = 0;
 	argc = 0;
@@ -1495,12 +1538,12 @@ format_cmd(int argc, char **argv, char *retbuf, size_t buflen)
     return (retbuf);
 }
 
-int
+static int
 vlogger(unsigned level, const char *format, va_list args)
 {
     /* Flawfinder: ignore (char) */
     char buffer[MAXSTRLEN], buffer2[MAXSTRLEN], buffer3[MAXSTRLEN];
-    char *username = "unknown";
+    const char *username = "unknown";
 
     if (level >= minimum_logging_level)
 	return -1;
@@ -1512,10 +1555,10 @@ vlogger(unsigned level, const char *format, va_list args)
     vsnprintf(buffer2, MAXSTRLEN, format, args);
     if (level & LOG_PRINT)
 	printf("%s\n", buffer2);
-    level &= ~LOG_PRINT;
+    level &= (unsigned)~LOG_PRINT;
     snprintf(buffer, MAXSTRLEN, "%s%s: %s", username,
-	     format_cmd(gargc, gargv, buffer3, MAXSTRLEN), buffer2);
-    syslog(level, "%s", buffer);
+	     format_cmd((size_t) gargc, gargv, buffer3, MAXSTRLEN), buffer2);
+    syslog((int)level, "%s", buffer);
     return -1;
 }
 
@@ -1545,4 +1588,15 @@ fatal(int logit, const char *format, ...)
 	logger(LOG_ERR, "%s", buffer);
     va_end(ap);
     exit(1);
+}
+
+static int
+rpl_reglog(unsigned level, int error, REGEXP_T * const *prog, const char *str)
+{
+    if (error != REG_NOMATCH) {
+	char *msg = rpl_regerror(error, prog);
+	error = logger(level, "Invalid regex '%s': %s", str, msg);
+	free(msg);
+    }
+    return error;
 }
