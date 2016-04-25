@@ -1,15 +1,15 @@
 #!/usr/bin/sh
 
 pkg=op
-ver=1.32.aix52
+ver=1.33.aix52
 exc='op.conf$'
-dir=usr/local
+dir=build/usr/local
 usr=root
 grp=system
 rdir=/home/ftp/diffusion/exploitation/op
 #post='chmod 700 /tmp/${pkg}_${ver}/${dir}/usr/local/etc/op.d'
 
 PATH=/usr/local/bin:$PATH # tar
-cd usr/local
+cd build/usr/local
 
-. ../../../mkpkg
+. ../../../../mkpkg
