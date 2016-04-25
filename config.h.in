@@ -1,4 +1,4 @@
-/* config.h.in.  Generated from configure.in by autoheader.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if the `closedir' function returns void instead of `int'. */
 #undef CLOSEDIR_VOID
@@ -65,6 +65,9 @@
 
 /* Define to 1 if you have the `regcomp' function. */
 #undef HAVE_REGCOMP
+
+/* Define to 1 if you have the `regex' functions. */
+#undef HAVE_REGEX
 
 /* Define to 1 if you have the <shadow.h> header file. */
 #undef HAVE_SHADOW_H
@@ -175,6 +178,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -190,12 +196,44 @@
 /* Use shadow file for authentication */
 #undef USE_SHADOW
 
+/* Enable extensions on AIX 3, Interix.  */
+#ifndef _ALL_SOURCE
+# undef _ALL_SOURCE
+#endif
+/* Enable GNU extensions on systems that have them.  */
+#ifndef _GNU_SOURCE
+# undef _GNU_SOURCE
+#endif
+/* Enable threading extensions on Solaris.  */
+#ifndef _POSIX_PTHREAD_SEMANTICS
+# undef _POSIX_PTHREAD_SEMANTICS
+#endif
+/* Enable extensions on HP NonStop.  */
+#ifndef _TANDEM_SOURCE
+# undef _TANDEM_SOURCE
+#endif
+/* Enable general extensions on Solaris.  */
+#ifndef __EXTENSIONS__
+# undef __EXTENSIONS__
+#endif
+
+
 /* Version number of package */
 #undef VERSION
 
 /* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
    `char[]'. */
 #undef YYTEXT_POINTER
+
+/* Define to 1 if on MINIX. */
+#undef _MINIX
+
+/* Define to 2 if the system does not provide POSIX.1 features except with
+   this defined. */
+#undef _POSIX_1_SOURCE
+
+/* Define to 1 if you need to in order for `stat' and other things to work. */
+#undef _POSIX_SOURCE
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
@@ -207,10 +245,16 @@
 #undef malloc
 
 /* Define to `int' if <sys/types.h> does not define. */
+#undef mode_t
+
+/* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
 
 /* Define to rpl_realloc if the replacement function should be used. */
 #undef realloc
+
+/* Define to `unsigned int' if <sys/types.h> does not define. */
+#undef size_t
 
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef uid_t

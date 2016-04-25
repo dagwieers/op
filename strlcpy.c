@@ -17,7 +17,8 @@
 
 /* OPENBSD ORIGINAL: lib/libc/string/strlcpy.c */
 
-#include <config.h>
+#include "defs.h"
+
 #ifndef HAVE_LIBBSD
 #ifndef HAVE_STRLCPY
 
@@ -50,7 +51,7 @@ size_t strlcpy(char *dst, const char *src, size_t siz)
 	while (*s++) {}
     }
 
-    return (s - src - 1);	/* count does not include NUL */
+    return (size_t) (s - src - 1);  /* count does not include NUL */
 }
 
 #endif				/* !HAVE_LIBBSD */

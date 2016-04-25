@@ -1,12 +1,14 @@
 home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
-vers=1.32
+vers=1.33
 PATH=/sbin:/usr/sbin:$PATH:/usr/openwin/bin
 
 set -e
 cd $home/op
 mkdir -p build/sunos59 packages
 cd $home/op/build/sunos59
+grep -q 'in  *;' ../../configure &&
+perl -pi -e 's/in +;/in .;/' ../../configure
 ../../configure --enable-xauth=/usr/openwin/bin/xauth
 make
 make install DESTDIR=$home/op/contrib/solaris

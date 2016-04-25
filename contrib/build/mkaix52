@@ -1,13 +1,1 @@
-home=$HOME
-
-# set -e
-cd $home/op
-mkdir -p build/aix52
-cd $home/op/build/aix52
-for i in lex.l main.c regexp.c snprintf.c strlcat.c strlcpy.c util.c yywrap.c op.1 op.conf-dist
-do ln -fs ../../$i; done; cp -p ../../lex.c lex.c
-../../configure --enable-xauth=/usr/bin/X11/xauth
-make
-make install DESTDIR=$home/op/contrib/aix52
-cd $home/op/contrib/aix52
-sh mkpkg
+mkaix43
