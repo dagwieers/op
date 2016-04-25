@@ -32,14 +32,30 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
+build_triplet = @build@
 bin_PROGRAMS = op$(EXEEXT)
 subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(srcdir)/op.list.in $(top_srcdir)/configure AUTHORS COPYING \
-	ChangeLog INSTALL NEWS depcomp install-sh lex.c missing ylwrap
+	ChangeLog INSTALL NEWS build-aux/config.guess \
+	build-aux/config.sub build-aux/depcomp build-aux/install-sh \
+	build-aux/missing build-aux/ylwrap lex.c
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.in
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_append_compile_flags.m4 \
+	$(top_srcdir)/m4/ax_append_flag.m4 \
+	$(top_srcdir)/m4/ax_append_link_flags.m4 \
+	$(top_srcdir)/m4/ax_cflags_aix_option.m4 \
+	$(top_srcdir)/m4/ax_cflags_warn_all.m4 \
+	$(top_srcdir)/m4/ax_check_compile_flag.m4 \
+	$(top_srcdir)/m4/ax_check_link_flag.m4 \
+	$(top_srcdir)/m4/ax_compiler_flags.m4 \
+	$(top_srcdir)/m4/ax_compiler_flags_cflags.m4 \
+	$(top_srcdir)/m4/ax_compiler_flags_gir.m4 \
+	$(top_srcdir)/m4/ax_compiler_flags_ldflags.m4 \
+	$(top_srcdir)/m4/ax_compiler_vendor.m4 \
+	$(top_srcdir)/m4/ax_require_defined.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -52,19 +68,20 @@ am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_op_OBJECTS = lex.$(OBJEXT) main.$(OBJEXT) regexp.$(OBJEXT) \
 	util.$(OBJEXT) snprintf.$(OBJEXT) strlcat.$(OBJEXT) \
-	strlcpy.$(OBJEXT) yywrap.$(OBJEXT)
+	strlcpy.$(OBJEXT) yywrap.$(OBJEXT) rplregex.$(OBJEXT)
 op_OBJECTS = $(am_op_OBJECTS)
 op_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@
-depcomp = $(SHELL) $(top_srcdir)/depcomp
+depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+@MAINTAINER_MODE_FALSE@am__skiplex = test -f $@ ||
 LEXCOMPILE = $(LEX) $(LFLAGS) $(AM_LFLAGS)
-YLWRAP = $(top_srcdir)/ylwrap
+YLWRAP = $(top_srcdir)/build-aux/ylwrap
 SOURCES = $(op_SOURCES)
 DIST_SOURCES = $(op_SOURCES)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
@@ -123,9 +140,10 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-EXTRA_CPPFLAGS = @EXTRA_CPPFLAGS@
+EXTRA_CFLAGS = @EXTRA_CFLAGS@
 #README
-EXTRA_WARN = @EXTRA_WARN@
+EXTRA_CPPFLAGS = @EXTRA_CPPFLAGS@
+EXTRA_LDFLAGS = @EXTRA_LDFLAGS@
 GREP = @GREP@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -139,6 +157,7 @@ LEX_OUTPUT_ROOT = @LEX_OUTPUT_ROOT@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
+MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 OBJEXT = @OBJEXT@
@@ -147,12 +166,17 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
+WARN_CFLAGS = @WARN_CFLAGS@
+WARN_LDFLAGS = @WARN_LDFLAGS@
+WARN_SCANNERFLAGS = @WARN_SCANNERFLAGS@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -164,7 +188,11 @@ am__quote = @am__quote@
 am__tar = @am__tar@
 am__untar = @am__untar@
 bindir = @bindir@
+build = @build@
 build_alias = @build_alias@
+build_cpu = @build_cpu@
+build_os = @build_os@
+build_vendor = @build_vendor@
 builddir = @builddir@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -195,14 +223,17 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+ACLOCAL_AMFLAGS = -I m4
 op_SOURCES = defs.h lex.l main.c regexp.c regexp.h util.c \
-	snprintf.c strlcat.c strlcpy.c yywrap.c
+	snprintf.c strlcat.c strlcpy.c yywrap.c rplregex.c rplregex.h
 
 man_MANS = op.1
 EXTRA_DIST = op.conf op.conf.complex op.list.in op.pam op.paper op.1 \
-	op.conf-dist autogen.sh contrib
+	op.conf-dist autogen.sh contrib m4
 
-AM_CPPFLAGS = $(EXTRA_WARN) -DSYSCONFDIR=\"$(sysconfdir)\" $(EXTRA_CPPFLAGS)
+AM_CPPFLAGS = $(EXTRA_CPPFLAGS) $(WARN_CFLAGS) -DSYSCONFDIR=\"$(sysconfdir)\"
+AM_CFLAGS = $(EXTRA_CFLAGS)
+AM_LDFLAGS = $(EXTRA_LDFLAGS) $(WARN_LDFLAGS)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -210,7 +241,7 @@ all: config.h
 .SUFFIXES: .c .l .o .obj
 am--refresh:
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -237,9 +268,9 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	$(SHELL) ./config.status --recheck
 
-$(top_srcdir)/configure:  $(am__configure_deps)
+$(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	$(am__cd) $(srcdir) && $(AUTOCONF)
-$(ACLOCAL_M4):  $(am__aclocal_m4_deps)
+$(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
 
@@ -252,7 +283,7 @@ config.h: stamp-h1
 stamp-h1: $(srcdir)/config.h.in $(top_builddir)/config.status
 	@rm -f stamp-h1
 	cd $(top_builddir) && $(SHELL) ./config.status config.h
-$(srcdir)/config.h.in:  $(am__configure_deps) 
+$(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) 
 	($(am__cd) $(top_srcdir) && $(AUTOHEADER))
 	rm -f stamp-h1
 	touch $@
@@ -311,6 +342,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lex.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/regexp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rplregex.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strlcat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strlcpy.Po@am__quote@
@@ -646,9 +678,8 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
+install-exec-am: install-binPROGRAMS install-exec-local
+
 install-html: install-html-am
 
 install-html-am:
@@ -692,7 +723,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-man
 
 uninstall-man: uninstall-man1
 
-.MAKE: all install-am install-exec-am install-strip
+.MAKE: all install-am install-strip
 
 .PHONY: CTAGS GTAGS all all-am am--refresh check check-am clean \
 	clean-binPROGRAMS clean-generic ctags dist dist-all dist-bzip2 \
@@ -702,17 +733,17 @@ uninstall-man: uninstall-man1
 	distuninstallcheck dvi dvi-am html html-am info info-am \
 	install install-am install-binPROGRAMS install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-exec-hook install-html install-html-am \
-	install-info install-info-am install-man install-man1 \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
-	tags uninstall uninstall-am uninstall-binPROGRAMS \
+	install-exec-am install-exec-local install-html \
+	install-html-am install-info install-info-am install-man \
+	install-man1 install-pdf install-pdf-am install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-compile mostlyclean-generic pdf pdf-am \
+	ps ps-am tags uninstall uninstall-am uninstall-binPROGRAMS \
 	uninstall-man uninstall-man1
 
 
-install-exec-hook: op.conf-dist
+install-exec-local: op.conf-dist
 	chmod 4755 $(DESTDIR)$(bindir)/op
 	test -d $(DESTDIR)$(sysconfdir) || \
 	$(INSTALL) -d -m 755 $(DESTDIR)$(sysconfdir)
@@ -722,8 +753,17 @@ install-exec-hook: op.conf-dist
 	test -f $(DESTDIR)$(sysconfdir)/op.conf || \
 	$(INSTALL) -m 600 op.conf-dist $(DESTDIR)$(sysconfdir)/op.conf
 
-# clean-local:
-# 	rm -f lex.c
+clobber: clean
+	rm -f lex.c
+
+cleanall:
+	rm -rf build
+	rm -rf contrib/aix??/op/op/build contrib/aix??/op/op/op.template
+	rm -rf contrib/hpux????/usr
+	rm -rf contrib/solaris/RATPop contrib/solaris/usr
+
+clobberall:
+	rm -rf packages
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
