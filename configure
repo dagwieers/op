@@ -7553,7 +7553,7 @@ done
 
 
 
-for flag in       ; do
+for flag in .; do
   as_CACHEVAR=`$as_echo "ax_cv_check_ldflags_$ax_compiler_flags_test_$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether the linker accepts $flag" >&5
 $as_echo_n "checking whether the linker accepts $flag... " >&6; }
