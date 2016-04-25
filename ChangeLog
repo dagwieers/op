@@ -1,3 +1,16 @@
+16/04/16 - op 1.33
+==================
+  * code auditing using flawfinder, cppcheck, cpplint.py and scan-build.
+  * Replaced strcpy/strcat by strlcpy/strlcat which are also provided if missing.
+  * Provided v/snprintf if missing.
+  * Replaced atoi by strtolong (util.c), atov still provided but unused.
+  * contrib dir added for various building and packaging architectures
+    (aix, hp-ux, linux, solaris). results goes to build and packages dirs.
+  * autoconf-archive macros added to m4 dir to enhance autotools configuration
+    such as compiler flags for hardening building.
+  * automake scripts moves to build-aux dir.
+  * Replaced v8 regexp by POSIX regex if possible.
+
 08/12/05 - op 1.32
 ==================
 
@@ -36,7 +49,7 @@ Broken down changes.
   * Added xauth support back in with {{{--enable-xauth=<xauth-binary>}}}.
 
 
- 27/05/05 - op 1.30
+27/05/05 - op 1.30
 ==================
 Fixed use of DEFAULT section, closes #5. Quite a pain in the arse actually.
 
