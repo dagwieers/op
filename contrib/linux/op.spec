@@ -7,7 +7,7 @@
 
 Summary: Controlled privilege escalation (a flexible alternative to sudo)
 Name: op
-Version: 1.32
+Version: 1.33
 Release: 1%{?dist}
 License: GPL
 Group: System Environment/Base
@@ -95,5 +95,5 @@ esac
 %doc op.conf.complex
 
 %changelog
-* Fri Jun  5 2012 Alec Thomas <alec@swapoff.org> - 1.32
+* Fri Jun  5 2012 Alec Thomas <alec@swapoff.org> - 1.33
 - Initial package.
