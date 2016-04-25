@@ -2,7 +2,7 @@ home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
 osrel=$(uname -r | sed 's|B.||')
 osver=$(uname -r | tr -d B.)
-vers=1.32
+vers=1.33
 PATH=/usr/sbin:$PATH
 
 set -e
@@ -11,6 +11,8 @@ mkdir -p build/hpux$osver packages
 cd $home/op/build/hpux$osver
 type lex > /dev/null 2>&1 || cp ../../lex.c .
 ln -fs ../../op.conf-dist .
+egrep -q 'in +;' ../../configure &&
+perl -pi -e 's/in +;/in .;/' ../../configure
 ../../configure --enable-xauth=/usr/bin/X11/xauth
 make
 make install DESTDIR=$home/op/contrib/hpux$osver
