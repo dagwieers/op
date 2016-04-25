@@ -1,9 +1,15 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <errno.h>
+/* +-------------------------------------------------------------------+ */
+/* | Copyright 1991, David Koblas.                                     | */
+/* |   Permission to use, copy, modify, and distribute this software   | */
+/* |   and its documentation for any purpose and without fee is hereby | */
+/* |   granted, provided that the above copyright notice appear in all | */
+/* |   copies and that both that copyright notice and this permission  | */
+/* |   notice appear in supporting documentation.  This software is    | */
+/* |   provided "as is" without express or implied warranty.           | */
+/* +-------------------------------------------------------------------+ */
+
 #include "defs.h"
+#include <errno.h>
 
 char *
 strtolower(char *in)
@@ -16,7 +22,7 @@ strtolower(char *in)
 }
 
 array_t *
-array_alloc()
+array_alloc(void)
 {
     array_t *array = malloc(sizeof(array_t));
 
@@ -76,6 +82,7 @@ array_extend(array_t * array, size_t capacity)
     return 1;
 }
 
+#ifdef malloc
 #undef malloc
 void *
 rpl_malloc(size_t n)
@@ -84,7 +91,9 @@ rpl_malloc(size_t n)
 	n = 1;
     return malloc(n);
 }
+#endif
 
+#ifdef realloc
 #undef realloc
 void *
 rpl_realloc(void *ptr, size_t n)
@@ -93,11 +102,12 @@ rpl_realloc(void *ptr, size_t n)
 	n = 1;
     return realloc(ptr, n);
 }
+#endif
 
 /* from man strtol(1) */
 /* NOLINTNEXTLINE(runtime/int) */
 long
-strtolong(char *str, int base)
+strtolong(const char *str, int base)
 {
     char *endptr;
     /* NOLINTNEXTLINE(runtime/int) */

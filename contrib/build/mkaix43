@@ -2,7 +2,7 @@ home=$HOME
 serv=sv003611
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
 osrel=$(oslevel | cut -d . -f 1-2)
-vers=1.32
+vers=1.33
 dist=$(echo $osrel | tr -d .)
 PATH=/usr/sbin:$PATH
 
@@ -11,8 +11,10 @@ cd $home/op
 make distclean
 mkdir -p build/aix$dist contrib/aix$dist/op/op/build packages
 cd $home/op/build/aix$dist
-for i in lex.l main.c regexp.c snprintf.c strlcat.c strlcpy.c util.c yywrap.c op.1 op.conf-dist
+for i in lex.l main.c regexp.c snprintf.c strlcat.c strlcpy.c util.c yywrap.c op.1 op.conf-dist rplregex.c
 do ln -fs ../../$i; done; cp -p ../../lex.c lex.c
+egrep -q 'in +;' ../../configure &&
+perl -pi -e 's/in +;/in .;/' ../../configure
 ../../configure --enable-xauth=/usr/bin/X11/xauth
 make
 sudo make install DESTDIR=$home/op/contrib/aix$dist/op/op/build
