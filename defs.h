@@ -8,40 +8,67 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
-#include <unistd.h>
-#include <limits.h>
 #include "config.h"
 
-#if TIME_WITH_SYS_TIME
+#include <ctype.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
+
+#if HAVE_MALLOC == 0
+# ifdef malloc
+#  undef malloc
+#  define rpl_malloc
+# endif
+# ifdef realloc
+#  undef realloc
+#  define rpl_realloc
+# endif
+#endif
+#include <stdlib.h>
+#if HAVE_MALLOC == 0
+# ifdef rpl_malloc
+#  undef rpl_malloc
+#  define malloc	rpl_malloc
+# endif
+# ifdef rpl_realloc
+#  undef rpl_realloc
+#  define realloc	rpl_realloc
+# endif
+#endif
+
+#include <unistd.h>
+
+#ifdef TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
 #else
-# if HAVE_SYS_TIME_H
+# ifdef HAVE_SYS_TIME_H
 #  include <sys/time.h>
 # else
 #  include <time.h>
 # endif
 #endif
 
-#if HAVE_DIRENT_H
+#ifdef HAVE_DIRENT_H
 # include <dirent.h>
 # define NAMLEN(dirent) strlen((dirent)->d_name)
 #else
 # define dirent direct
 # define NAMLEN(dirent) (dirent)->d_namlen
-# if HAVE_SYS_NDIR_H
+# ifdef HAVE_SYS_NDIR_H
 #  include <sys/ndir.h>
 # endif
-# if HAVE_SYS_DIR_H
+# ifdef HAVE_SYS_DIR_H
 #  include <sys/dir.h>
 # endif
-# if HAVE_NDIR_H
+# ifdef HAVE_NDIR_H
 #  include <ndir.h>
 # endif
 #endif
 
 #include <sys/types.h>
-#if HAVE_SYS_WAIT_H
+#ifdef HAVE_SYS_WAIT_H
 # include <sys/wait.h>
 #endif
 #ifndef WEXITSTATUS
@@ -51,30 +78,30 @@
 # define WIFEXITED(stat_val) (((stat_val) & 255) == 0)
 #endif
 
-#if STDC_HEADERS
+#ifdef STDC_HEADERS
 # include <string.h>
 #else
-# if !HAVE_STRCHR
+# ifndef HAVE_STRCHR
 #  define strchr index
 #  define strrchr rindex
 # endif
 char *strchr(), *strrchr();
-# if !HAVE_MEMCPY
+# ifndef HAVE_MEMCPY
 #  define memcpy(d, s, n) bcopy ((s), (d), (n))
 #  define memmove(d, s, n) bcopy ((s), (d), (n))
 # endif
 #endif
 
-#if HAVE_LIBBSD
+#ifdef HAVE_LIBBSD
 #include <bsd/string.h>
 #else
-# if !HAVE_STRLCAT
+# ifndef HAVE_STRLCAT
 size_t strlcat(char *dst, const char *src, size_t siz);
 size_t strlcpy(char *dst, const char *src, size_t siz);
 # endif
 #endif
 
-#if !HAVE_VSNPRINTF
+#ifndef HAVE_VSNPRINTF
 int snprintf(char *str, size_t size, const char *format, ...);
 int vsnprintf(char *str, size_t size, const char *format, va_list arg);
 #endif
@@ -112,28 +139,29 @@ typedef struct array_s {
 
 /* functions to manage a dynamically extensible array of pointers */
 #define ARRAY_CHUNK	32
-array_t *array_alloc();
+array_t *array_alloc(void);
 void array_free(array_t * array);
 array_t *array_free_contents(array_t * array);
 void *array_push(array_t * array, void *object);
 void *array_pop(array_t * array);
 int array_extend(array_t * array, size_t capacity);
 
-extern cmd_t *First, *Build(), *BuildSingle();
+char *savestr(const char *str);
+cmd_t *Build(cmd_t * def, cmd_t * cmd);
+cmd_t *BuildSingle(cmd_t * def, cmd_t * cmd);
+
+extern cmd_t *First;
 extern var_t *Variables;
-extern unsigned minimum_logging_level;
 
 /* cppcheck-suppress noreturn */
+int logger(unsigned level, const char *format, ...);
 void fatal(int logit, const char *format, ...);
-int logger(unsigned flags, const char *format, ...);
 char *strtolower(char *in);
 /* NOLINTNEXTLINE(runtime/int) */
-long strtolong(char *str, int base);
+long strtolong(const char *str, int base);
 
-int ReadFile(char *file);
-int ReadDir(char *dir);
+int ReadFile(const char *file);
 int CountArgs(cmd_t * cmd);
-int atov(char *str, int type);
 
 #define MAXSTRLEN	2048
 #ifndef SYSCONFDIR
@@ -147,4 +175,8 @@ int atov(char *str, int type);
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX	255
+#endif
+
+#ifndef PASS_MAX
+#define PASS_MAX	512
 #endif
