@@ -25,6 +25,9 @@
 ** EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **/
 
+#ifndef _RPLREGEX_H_
+#define _RPLREGEX_H_
+
 #ifdef HAVE_REGEX
 #include <regex.h>
 #define REGEXP_T	regexp_t
@@ -53,3 +56,5 @@ int rpl_regcomp(REGEXP_T **_prog, const char *regex, int cflags);
 int rpl_regexec(REGEXP_T * const *_prog, const char *string);
 int rpl_regsub(REGEXP_T * const *_prog, const char *source, char *dest, size_t size);
 char *rpl_regerror(int error, REGEXP_T * const *_prog);
+
+#endif /* !_RPLREGEX_H_ */
