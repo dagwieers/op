@@ -8,6 +8,9 @@
 /* |   provided "as is" without express or implied warranty.           | */
 /* +-------------------------------------------------------------------+ */
 
+#ifndef _DEFS_H_
+#define _DEFS_H_
+
 #include "config.h"
 
 #include <ctype.h>
@@ -180,3 +183,5 @@ int CountArgs(cmd_t * cmd);
 #ifndef PASS_MAX
 #define PASS_MAX	512
 #endif
+
+#endif /* !_DEFS_H_ */
