@@ -176,6 +176,7 @@ AS_IF([test "_${ax_cv_c_compiler_vendor}" = _gnu], [
 	dnl rhel  4.x  gcc 3.4.6 ld 2.15
 	dnl rhel  5.x  gcc 4.1.2 ld 2.17
 	dnl rhel  6.x  gcc 4.4.7 ld 2.20 x86_64-unknown-linux-gnu
+	dnl rhel  7.x  gcc 4.8.5 ld 2.25 x86_64-unknown-linux-gnu
 	dnl aix   5.2  gcc 3.3.2 ld aix  powerpc-ibm-aix5.2.0.0
 	dnl hpux 11.00 gcc 3.2   ld hp   hppa2.0w-hp-hpux11.00
 	dnl hpux 11.11 gcc 4.1.1 ld hp   hppa2.0w-hp-hpux11.11
@@ -287,15 +288,19 @@ dnl https://wiki.archlinux.org/index.php/DeveloperWiki:Security
 	# Warn about optimizations taken due to [undefined] signed integer overflow assumptions
 	AX_APPEND_COMPILE_FLAGS([-Wstrict-overflow], [EXTRA_CPPFLAGS]) # gcc 4.2
 
+	# Enable exception handling.  Generates extra code needed to propagate exceptions
+	AX_APPEND_COMPILE_FLAGS([-fexceptions], [EXTRA_CFLAGS])
+
 	# Enable AddressSanitizer, a fast memory error detector. Memory access instructions
 	# will be instrumented to help detect heap, stack, and global buffer overflows;
 	# as well as use-after-free bugs
 	AX_APPEND_COMPILE_FLAGS([-fsanitize=address], [EXTRA_CFLAGS]) # gcc 4.8
+	AX_APPEND_COMPILE_FLAGS([-static-libasan], [EXTRA_CFLAGS]) # gcc 4.8
 
 	# FORTIFY_SOURCE / buffer overflow
 	AX_APPEND_COMPILE_FLAGS(['-O1 -D_FORTIFY_SOURCE=2'], [EXTRA_CPPFLAGS]) # gcc 4.1
 
-	dnl too many warning: frame size too large for reliable stack checking
+	dnl # too many warning: frame size too large for reliable stack checking
 	dnl AX_APPEND_COMPILE_FLAGS([-fstack-check], [EXTRA_CFLAGS])
 
 	# Stack Smashing Protection
