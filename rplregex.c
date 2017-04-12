@@ -51,6 +51,7 @@ void rpl_regfree(REGEXP_T **_prog)
     regfree(&prog->preg);
 #endif
     free(prog);
+    *_prog = (REGEXP_T *) NULL;
 }
 
 int rpl_regcomp(REGEXP_T **_prog, const char *regex, int cflags)
