@@ -1,6 +1,6 @@
 home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
-vers=1.33
+vers=1.34
 PATH=/sbin:/usr/sbin:$PATH:/usr/openwin/bin
 
 set -e

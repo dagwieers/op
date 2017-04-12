@@ -2,7 +2,7 @@ home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
 osrel=$(uname -r | sed 's|B.||')
 osver=$(uname -r | tr -d B.)
-vers=1.33
+vers=1.34
 PATH=/usr/sbin:$PATH
 
 set -e

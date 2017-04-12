@@ -28,7 +28,7 @@ product
         tag OP
         title "Controlled privilege escalation (a flexible alternative to sudo)"
         description "Controlled privilege escalation (a flexible alternative to sudo)"
-        revision 1.33
+        revision 1.34
         #
         architecture S700/S800_HPUX_11
         machine_type 9000/[78]*
@@ -39,7 +39,7 @@ product
         fileset
                 tag op
                 title "op executables"
-                revision 1.33
+                revision 1.34
 
                 file -u 0177 -g root -o root usr/local/etc/op.conf-dist /usr/local/etc/op.conf-dist
                 file -m 4755 -g bin -o root usr/local/bin/op /usr/local/bin/op

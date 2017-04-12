@@ -1,7 +1,7 @@
 #!/usr/bin/sh
 
 pkg=op
-ver=1.33.aix52
+ver=1.34.aix52
 exc='op.conf$'
 dir=build/usr/local
 usr=root

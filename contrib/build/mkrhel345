@@ -1,6 +1,6 @@
 home=$HOME
 rdist=esxide@recife:/home/ftp/diffusion/exploitation/op/
-vers=1.33
+vers=1.34
 dist=.el$(tr -dc 0-9 < /etc/redhat-release | cut -c 1)
 type xauth | grep -q X11 && x11='--with x11' || x11=
 
