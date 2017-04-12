@@ -1,3 +1,8 @@
+13/04/17 - op 1.34
+==================
+  * port to RHEL 7
+  * https://travis-ci.org/
+
 16/04/16 - op 1.33
 ==================
   * code auditing using flawfinder, cppcheck, cpplint.py and scan-build.

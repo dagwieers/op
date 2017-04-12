@@ -1,6 +1,6 @@
 rhost=esxide@recife
 rdir=/home/ftp/diffusion/exploitation/op
-vers=1.33
+vers=1.34
 
 ssh -o LogLevel=ERROR ${rhost} \
 "cd ${rdir} && /usr/local/bin/tar zcf ${rdir}/op_${vers}.tar.gz *${vers}*.rpm *${vers}*.depot *${vers}*.bff *${vers}*.pkg *.admin"
