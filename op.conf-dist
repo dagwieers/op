@@ -50,7 +50,37 @@ sh	/bin/sh $*;
 	environment
 	help="sh [arg...] + env"
 
--	/bin/su -;
+--	/bin/su -;
+	groups=GRP_PRIVALL
+	$TERM $DISPLAY
+	help="su -"
+
+-	/bin/sh -c '
+	while [ -n "${DISPLAY}" -a -z "${XAUTHORITY}" ]; do
+		found=0
+		for xauth in /usr/bin/xauth /usr/bin/X11/xauth /usr/openwin/bin/xauth; do
+			[ -x ${xauth} ] && found=1 && break
+		done
+		[ ${found} = 0 ] && break
+		home=$(eval echo ~$(id -un))
+		if [ -f /stand/vmunix ]; then
+			export XAUTHORITY=$(mktemp -c -d "${home}" -p .xauth)
+		elif [ -f /proc/version ]; then
+			export XAUTHORITY=$(mktemp -t -p "${home}" .xauthXXXXXX)
+		fi
+		until [ -f "${XAUTHORITY}" ]; do
+			XAUTHORITY=${home}/.xauth$(awk \'BEGIN{srand();printf "%06.6i", int(rand()*1000000)}\' /dev/null)
+			touch "${XAUTHORITY}.$$" 2> /dev/null || break; break=
+			ln "${XAUTHORITY}.$$" "${XAUTHORITY}" 2> /dev/null && break=
+			rm -f "${XAUTHORITY}.$$"; $break
+		done
+		[ ! -f "${XAUTHORITY}" ] && unset XAUTHORITY && break
+		((sleep 5; rm -f "${XAUTHORITY}") &)
+		eval ${xauth} -f ~${USER}/.Xauthority extract - :${DISPLAY#*:} |
+		${xauth} merge -; break
+	done
+	[ -z "${XAUTHORITY}" ] && unset DISPLAY
+	exec /bin/su -';
 	groups=GRP_PRIVALL
 	$TERM $DISPLAY
 	help="su -"
